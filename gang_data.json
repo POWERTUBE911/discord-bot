@@ -1,0 +1,22 @@
+{
+    "gangs": [
+        { "name": "البلود", "points": 1, "level": 0 },
+        { "name": "المافيا", "points": 0, "level": 0 },
+        { "name": "القروف ستريت", "points": 0, "level": 0 },
+        { "name": "الكف الأسود", "points": 0, "level": 0 },
+        { "name": "عائلة الرئيس", "points": 0, "level": 0 }
+    ],
+    "rewards_levels": [
+        { "level": 0, "points": 0, "reward": "بداية العصابة" },
+        { "level": 1, "points": 15, "reward": "تصريح استخدام جلوك للعصابة" },
+        { "level": 2, "points": 35, "reward": "كاش 25 ألف للعصابة" },
+        { "level": 3, "points": 60, "reward": "لا توجد جائزة" },
+        { "level": 4, "points": 90, "reward": "لا توجد جائزة" },
+        { "level": 5, "points": 125, "reward": "تصريح استخدام سلاح MP5 | كاش 30 ألف" },
+        { "level": 6, "points": 165, "reward": "كاش 50 ألف للعصابة" },
+        { "level": 7, "points": 210, "reward": "مقر للعصابة" },
+        { "level": 8, "points": 260, "reward": "تصريح استخدام AK" },
+        { "level": 9, "points": 315, "reward": "كاش 100 ألف للعصابة" },
+        { "level": 10, "points": 375, "reward": "تصريح استخدام سلاح AS10 | +1 عدد في كل حالة سرقة" }
+    ]
+}

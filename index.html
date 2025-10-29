@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GANG WAR - نظام إدارة العصابات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide:wght@400&family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- مؤثرات الخلفية -->
+    <div class="background-effects">
+        <div class="particles"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <!-- حقوق الملكية -->
+    <div class="copyright">
+        <i class="fas fa-crown"></i> © مجنون 🇲🇦
+    </div>
+
+    <!-- صفحة الدخول -->
+    <div class="login-page" id="loginPage">
+        <div class="login-container">
+            <div class="logo-container">
+                <h1 class="main-title">GANG WAR</h1>
+                <p class="subtitle">نظام إدارة العصابات المتقدم</p>
+            </div>
+            <button class="enter-btn" onclick="enterApp()">
+                <i class="fas fa-play"></i>
+                <span>دخول التطبيق</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- التطبيق الرئيسي -->
+    <div class="main-app" id="mainApp">
+        <!-- زر القائمة الجانبية للهاتف -->
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <!-- شريط التنقل الجانبي -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-skull"></i>
+                    <span>GANG WAR</span>
+                </div>
+                <button class="sidebar-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <div class="sidebar-menu">
+                <div class="menu-item active" onclick="showSection('gangs')">
+                    <i class="fas fa-users"></i>
+                    <span>العصابات</span>
+                </div>
+                <div class="menu-item" onclick="showSection('rewards')">
+                    <i class="fas fa-trophy"></i>
+                    <span>الجوائز</span>
+                </div>
+                <div class="menu-item" onclick="showSection('points')">
+                    <i class="fas fa-star"></i>
+                    <span>طرق الحصول على النقاط</span>
+                </div>
+                <div class="menu-item" onclick="showSection('honors')">
+                    <i class="fas fa-medal"></i>
+                    <span>قسم التشريف</span>
+                </div>
+                <div class="menu-item" onclick="showSection('info')">
+                    <i class="fas fa-info-circle"></i>
+                    <span>معلومات التطبيق</span>
+                </div>
+                <div class="menu-item" onclick="showSection('admin')">
+                    <i class="fas fa-cog"></i>
+                    <span>الإدارة</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="main-content">
+            <!-- شريط الإشعارات -->
+            <div class="notification-bar" id="notificationBar">
+                <div class="notification-content">
+                    <i class="fas fa-bullhorn"></i>
+                    <span id="notificationText">مرحباً بكم في نظام إدارة العصابات المتقدم</span>
+                </div>
+                <button class="notification-close" onclick="hideNotification()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- قسم العصابات -->
+            <div class="section active" id="gangsSection">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-users"></i>
+                        العصابات
+                    </h2>
+                    <div class="search-container">
+                        <input type="text" id="gangSearch" placeholder="البحث عن عصابة..." onkeyup="searchGangs()">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+                
+                <!-- عداد الحرب -->
+                <div class="war-timer" id="warTimer">
+                    <div class="timer-header">
+                        <i class="fas fa-clock"></i>
+                        <span>الحرب القادمة</span>
+                    </div>
+                    <div class="timer-content">
+                        <div class="timer-display" id="timerDisplay">00:00:00</div>
+                        <div class="war-participants" id="warParticipants">
+                            <span>لم يتم تحديد حرب بعد</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gangs-grid" id="gangsList"></div>
+            </div>
+
+            <!-- قسم الجوائز -->
+            <div class="section" id="rewardsSection">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-trophy"></i>
+                        الجوائز والمستويات
+                    </h2>
+                </div>
+                <div class="rewards-container">
+                    <div class="rewards-table-container">
+                        <table class="rewards-table">
+                            <thead>
+                                <tr>
+                                    <th>المستوى</th>
+                                    <th>النقاط المطلوبة</th>
+                                    <th>الحد الأقصى للأعضاء</th>
+                                    <th>المكافأة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rewardsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم طرق الحصول على النقاط -->
+            <div class="section" id="pointsSection">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-star"></i>
+                        طرق الحصول على النقاط
+                    </h2>
+                </div>
+                <div class="points-methods" id="pointsMethods">
+                    <!-- سيتم ملؤها بواسطة JavaScript -->
+                </div>
+            </div>
+
+            <!-- قسم التشريف -->
+            <div class="section" id="honorsSection">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-medal"></i>
+                        قسم التشريف
+                    </h2>
+                </div>
+                <div class="honors-container">
+                    <div class="honor-card">
+                        <div class="honor-title">
+                            <i class="fas fa-crown"></i>
+                            آخر عصابة فائزة
+                        </div>
+                        <div class="honor-content" id="lastWinnerGang">
+                            <div class="gang-logo">
+                                <img src="https://via.placeholder.com/80x80/ff0000/ffffff?text=G" alt="شعار العصابة">
+                            </div>
+                            <div class="gang-info">
+                                <h3>لم يتم تحديد فائز بعد</h3>
+                                <p>في انتظار أول حرب</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="honor-card">
+                        <div class="honor-title">
+                            <i class="fas fa-fire"></i>
+                            أعلى عدد قتلات
+                        </div>
+                        <div class="honor-content" id="topKiller">
+                            <div class="player-avatar">
+                                <img src="https://via.placeholder.com/80x80/00ff00/ffffff?text=P" alt="صورة اللاعب">
+                            </div>
+                            <div class="player-info">
+                                <h3>لم يتم تحديد بعد</h3>
+                                <p>في انتظار أول حرب</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم معلومات التطبيق -->
+            <div class="section" id="infoSection">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-info-circle"></i>
+                        معلومات التطبيق
+                    </h2>
+                </div>
+                <div class="info-content" id="appInfo">
+                    <div class="info-card">
+                        <h3>نبذة عن التطبيق</h3>
+                        <p>تطبيق GANG WAR هو نظام متقدم لإدارة العصابات يتيح لك مراقبة مستويات ونقاط كل عصابة، بالإضافة إلى الجوائز التي يمكن الحصول عليها. يتضمن التطبيق نظام GANG WAR أسبوعي بين العصابات يمنح نقاط للعصابات الفائزة.</p>
+                        
+                        <h4>الأنشطة المتاحة:</h4>
+                        <ul>
+                            <li><strong>سرقة البقالة:</strong> نشاط أساسي لكسب النقاط</li>
+                            <li><strong>سطو البنك المركزي:</strong> عملية عالية المخاطر والمكافآت</li>
+                            <li><strong>مداهمة المحكمة:</strong> تحدي قانوني خطير</li>
+                            <li><strong>مداهمة مركز الشرطة:</strong> مواجهة مباشرة مع السلطات</li>
+                            <li><strong>مداهمة المراكز الحكومية:</strong> عمليات استراتيجية</li>
+                            <li><strong>خطف القادة العليا:</strong> عمليات عالية الأهمية</li>
+                            <li><strong>مداهمة مقرات العصابات:</strong> حروب مباشرة بين العصابات</li>
+                        </ul>
+                        
+                        <p>جميع هذه الأنشطة تمنح نقاط متفاوتة حسب مستوى الصعوبة والمخاطرة.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم الإدارة -->
+            <div class="section" id="adminSection">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-cog"></i>
+                        لوحة المشرف
+                    </h2>
+                </div>
+                
+                <!-- تسجيل دخول الأدمن -->
+                <div class="admin-login" id="adminLogin">
+                    <div class="login-card">
+                        <h3>تسجيل دخول المشرف</h3>
+                        <div class="form-group">
+                            <label>كود الأدمن أو المالك:</label>
+                            <input type="password" id="adminCode" placeholder="أدخل الكود">
+                        </div>
+                        <button class="btn primary" onclick="adminLogin()">
+                            <i class="fas fa-sign-in-alt"></i>
+                            تسجيل دخول
+                        </button>
+                    </div>
+                </div>
+
+                <!-- أدوات الإدارة -->
+                <div class="admin-actions" id="adminActions">
+                    <div class="admin-welcome" id="adminWelcome"></div>
+
+                    <!-- تبويبات الإدارة -->
+                    <div class="admin-tabs">
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" onclick="showAdminTab('gangs-management')">
+                                <i class="fas fa-users"></i>
+                                إدارة العصابات
+                            </button>
+                            <button class="tab-btn" onclick="showAdminTab('rewards-management')">
+                                <i class="fas fa-trophy"></i>
+                                إدارة الجوائز
+                            </button>
+                            <button class="tab-btn" onclick="showAdminTab('content-management')">
+                                <i class="fas fa-edit"></i>
+                                إدارة المحتوى
+                            </button>
+                            <button class="tab-btn" onclick="showAdminTab('war-management')">
+                                <i class="fas fa-sword"></i>
+                                إدارة الحروب
+                            </button>
+                            <button class="tab-btn" onclick="showAdminTab('codes-management')" id="codesTab">
+                                <i class="fas fa-key"></i>
+                                إدارة الأكواد
+                            </button>
+                            <button class="tab-btn" onclick="showAdminTab('logs')">
+                                <i class="fas fa-history"></i>
+                                سجل العمليات
+                            </button>
+                        </div>
+
+                        <!-- محتوى التبويبات -->
+                        <div class="tab-content">
+                            <!-- إدارة العصابات -->
+                            <div class="tab-panel active" id="gangs-management">
+                                <div class="admin-section">
+                                    <h4>إدارة العصابات</h4>
+                                    
+                                    <div class="form-group">
+                                        <label>اختيار العصابة:</label>
+                                        <select id="gangSelect"></select>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>تحديث النقاط:</label>
+                                            <input type="number" id="pointsInput" placeholder="النقاط (يمكن أن تكون سالبة)">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>السبب:</label>
+                                            <textarea id="reasonInput" placeholder="سبب إضافة أو إزالة النقاط"></textarea>
+                                        </div>
+                                    </div>
+                                    <button class="btn primary" onclick="updateGangPoints()">
+                                        <i class="fas fa-plus"></i>
+                                        تحديث النقاط
+                                    </button>
+
+                                    <div class="form-group">
+                                        <label>تغيير اسم العصابة:</label>
+                                        <div class="input-group">
+                                            <input type="text" id="gangNameInput" placeholder="الاسم الجديد">
+                                            <button class="btn secondary" onclick="updateGangName()">
+                                                <i class="fas fa-edit"></i>
+                                                تعديل
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>شعار العصابة:</label>
+                                        <div class="logo-upload">
+                                            <input type="file" id="gangLogoInput" accept="image/*" onchange="uploadGangLogo()">
+                                            <label for="gangLogoInput" class="upload-btn">
+                                                <i class="fas fa-upload"></i>
+                                                رفع شعار
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>إضافة عصابة جديدة:</label>
+                                        <div class="input-group">
+                                            <input type="text" id="newGangInput" placeholder="اسم العصابة الجديدة">
+                                            <button class="btn success" onclick="addNewGang()">
+                                                <i class="fas fa-plus"></i>
+                                                إضافة
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <button class="btn danger" onclick="deleteGang()">
+                                        <i class="fas fa-trash"></i>
+                                        حذف العصابة المختارة
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- إدارة الجوائز -->
+                            <div class="tab-panel" id="rewards-management">
+                                <div class="admin-section">
+                                    <h4>إدارة الجوائز</h4>
+                                    <div class="rewards-editor" id="rewardsEditor">
+                                        <!-- سيتم ملؤها بواسطة JavaScript -->
+                                    </div>
+                                    <button class="btn primary" onclick="saveRewards()">
+                                        <i class="fas fa-save"></i>
+                                        حفظ التغييرات
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- إدارة المحتوى -->
+                            <div class="tab-panel" id="content-management">
+                                <div class="admin-section">
+                                    <h4>إدارة المحتوى</h4>
+                                    
+                                    <div class="form-group">
+                                        <label>معلومات التطبيق:</label>
+                                        <textarea id="appInfoEditor" rows="10" placeholder="محتوى معلومات التطبيق..."></textarea>
+                                        <button class="btn primary" onclick="saveAppInfo()">
+                                            <i class="fas fa-save"></i>
+                                            حفظ معلومات التطبيق
+                                        </button>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>طرق الحصول على النقاط:</label>
+                                        <div id="pointsMethodsEditor">
+                                            <!-- سيتم ملؤها بواسطة JavaScript -->
+                                        </div>
+                                        <button class="btn primary" onclick="savePointsMethods()">
+                                            <i class="fas fa-save"></i>
+                                            حفظ طرق النقاط
+                                        </button>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>الإشعارات العامة:</label>
+                                        <div class="input-group">
+                                            <input type="text" id="notificationInput" placeholder="نص الإشعار...">
+                                            <button class="btn primary" onclick="sendNotification()">
+                                                <i class="fas fa-bullhorn"></i>
+                                                إرسال
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- إدارة الحروب -->
+                            <div class="tab-panel" id="war-management">
+                                <div class="admin-section">
+                                    <h4>إدارة الحروب</h4>
+                                    
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>العصابة الأولى:</label>
+                                            <select id="warGang1"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>العصابة الثانية:</label>
+                                            <select id="warGang2"></select>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>تاريخ الحرب:</label>
+                                            <input type="date" id="warDate">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>وقت الحرب:</label>
+                                            <input type="time" id="warTime">
+                                        </div>
+                                    </div>
+
+                                    <div class="war-controls">
+                                        <button class="btn primary" onclick="scheduleWar()">
+                                            <i class="fas fa-calendar-plus"></i>
+                                            جدولة الحرب
+                                        </button>
+                                        <button class="btn success" onclick="startWar()">
+                                            <i class="fas fa-play"></i>
+                                            بدء الحرب الآن
+                                        </button>
+                                        <button class="btn danger" onclick="endWar()">
+                                            <i class="fas fa-stop"></i>
+                                            إنهاء الحرب
+                                        </button>
+                                    </div>
+
+                                    <div class="war-results" id="warResults">
+                                        <h5>نتائج الحرب</h5>
+                                        <div class="form-group">
+                                            <label>العصابة الفائزة:</label>
+                                            <select id="winnerGang"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>أعلى قاتل (اسم المستخدم):</label>
+                                            <input type="text" id="topKillerName" placeholder="اسم اللاعب">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>رابط صورة اللاعب (Discord):</label>
+                                            <input type="url" id="topKillerAvatar" placeholder="رابط الصورة">
+                                        </div>
+                                        <button class="btn success" onclick="saveWarResults()">
+                                            <i class="fas fa-save"></i>
+                                            حفظ النتائج
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- إدارة الأكواد -->
+                            <div class="tab-panel owner-only" id="codes-management">
+                                <div class="admin-section">
+                                    <h4>إدارة أكواد المشرفين (للمالك فقط)</h4>
+                                    
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>كود جديد:</label>
+                                            <input type="text" id="newAdminCode" placeholder="الكود الجديد">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>اسم المستخدم:</label>
+                                            <input type="text" id="newAdminName" placeholder="اسم المستخدم">
+                                        </div>
+                                    </div>
+                                    <button class="btn primary" onclick="addAdminCode()">
+                                        <i class="fas fa-plus"></i>
+                                        إضافة كود
+                                    </button>
+
+                                    <div class="codes-list">
+                                        <div class="codes-header">
+                                            <h5>أكواد المشرفين الحالية</h5>
+                                            <button class="btn secondary small" onclick="toggleCodesVisibility()">
+                                                <i class="fas fa-eye" id="codesVisibilityIcon"></i>
+                                                <span id="codesVisibilityText">إخفاء الأكواد</span>
+                                            </button>
+                                        </div>
+                                        <div class="codes-display" id="codesDisplay"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- سجل العمليات -->
+                            <div class="tab-panel" id="logs">
+                                <div class="admin-section">
+                                    <h4>سجل العمليات</h4>
+                                    <div class="logs-controls">
+                                        <button class="btn secondary" onclick="clearLogs()">
+                                            <i class="fas fa-trash"></i>
+                                            مسح السجل
+                                        </button>
+                                        <button class="btn secondary" onclick="exportLogs()">
+                                            <i class="fas fa-download"></i>
+                                            تصدير السجل
+                                        </button>
+                                    </div>
+                                    <div class="info-log" id="infoLogDisplay"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- النافذة المنبثقة للعصابة -->
+    <div class="gang-modal" id="gangModal">
+        <div class="gang-modal-content">
+            <div class="gang-modal-header">
+                <h3 class="gang-modal-title" id="gangModalTitle"></h3>
+                <button class="close-btn" onclick="closeGangModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="gangModalContent"></div>
+        </div>
+    </div>
+
+    <!-- مشغل الصوت -->
+    <audio id="audioPlayer" preload="auto">
+        <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav">
+    </audio>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
