@@ -1,7 +1,7 @@
 # قم بوضع رمز البوت (Token) الخاص بك هنا
 # يجب أن تحصل على هذا الرمز من بوابة مطوري ديسكورد (Discord Developer Portal)
 # تأكد من عدم مشاركة هذا الرمز مع أي شخص آخر!
-BOT_TOKEN = "MTQzMzA1MDQyNjQxMTg0NzgxMg.G8rW2h.ban4qEnwtESMmJXGuDt6yc609VS18SR7LhIOr8"
+BOT_TOKEN = "MTQzMzA1MDQyNjQxMTg0NzgxMg.GzikT1.MnVim87VgjOPaw3Of4XGk1jxX_3tOyCpDiWmm0"
 
 # بيانات اتصال Firebase Realtime Database (مستخلصة من ملف script.js)
 # يرجى ملاحظة: قد تحتاج إلى إعداد قواعد أمان (Security Rules) في Firebase
