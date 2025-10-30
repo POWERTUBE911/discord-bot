@@ -6,7 +6,12 @@ from firebase import firebase
 from config import BOT_TOKEN, FIREBASE_URL # استيراد بيانات Firebase من config.py
 
 # تعريف البوت
-bot = commands.Bot(command_prefix='!', intents=discord.Intents.default())
+intents = discord.Intents.default()
+intents.message_content = True
+intents.guilds = True
+intents.members = True
+
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 # تهيئة اتصال Firebase
 firebase_app = firebase.FirebaseApplication(FIREBASE_URL, None)
