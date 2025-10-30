@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "gang-war-2",
+  "private_key_id": "77d66075da456b5230b38c4fb38bf068e560ff5b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCTHwhL2J4fhaNq\n3YiEZo2IiV9112mUseEvHNfDYga8rlJFakSNs16W/QHkRavNED/aElLjtG5MurQ7\npeZUG0+drTttgiN2VmpBeb1RFVN+olDqCoDpuBdx1u/KLHwetDPO4S9fhClNmoEu\nZ/2ZE2i8Ojrx72eGbhodPL0C6Fv8cltZ7yKvSppeDrhPvr7aWS5w34nt4b2Lskxg\nsH9+/If4HGEFCKKhg0Z+yOnykrsYQNN1tlNfIHPwApNB87p7lZZX9xdpbjbgwKcj\nbNuJdStBpfte6294pNNrgdoBIfQ2kGB86Eqx7TgLgTx9iga0cuMf6BXpno3akRIS\nDd2xvlVLAgMBAAECggEAMynmITZmmzDHCamcSes+Sl7310wAOEl6Nf+yW4zyKdj3\n3JMd3yejfB/l8gR2wFxn0EdyEyVS/JUri9jglpxe3kd59NX+zi80Sav0NkgT3uTE\n/feEKIOwh5MHlkhNLAJgSBCRAIc+M/JI/aIFlCAnWtpnWG75EkulAkj2tJWpM8vs\nJ/YuvM/yQ0yTHiLcwY3SiAYk53B8yz2nv3AxVBbcUKRFyRpRi0vXU5cZ/f+s6Up2\nUshsmkPwNbXPr3j7ssmz3jFMpXDVI3z/IjX1LaWc+c+ZTJ5jQFQwwYrhsbhmEY2p\n2A2D9rpl4kr+Mn3c8Rgqge4cF7Ts9D3nWFYDjGjGvQKBgQDMJaO2NQOZy1mpdSy1\n/CTB+GI2Zwwrd7hmHo9KjFtvM/kNepcPcORigzmEPHnlgua9woZWRea6bc5H1rwK\n6XlYeby3cpKs4ubEHgEcw/vrmCavngUa+2UVJCnl7NYDr0pTQ3D3JEmW/p8Nmi4O\naC1ldNK2sGvqVdvXTQex9wJTTQKBgQC4fV+d+m9y4Yl9MQZ97QfNd/LMtejtQkmP\nCe4GKBkrr9cfNJsGpR94bz9iJkndN1KNYHy3rlmf4Wt9uCPGVHJDHV5H1D7gUEK7\nogf+JfG4CI+FCRwcjkiK9LTQP0rs6BOE1ZiYnLEj52tyc0h6Ic/zJTjDueK1TBOU\nXdzu0VjO9wKBgGU8tTcCi0qVYV170jRdWg0nE+1OpOZZdISP2xdpC17WM0fP52Gs\n5lVEJh3Br+F1TOAFu4DFIWqKUaWmg5IVvit2E3QVyU8bJr1S89JEDoYC6gxlHLsI\nuFQHnw96p5ckMoOgCkFFKYlLs6yXLQfP+dM6X9RhIOMQuPjIJmzGxcxxAoGBAKmc\nujencqcPqzOpyuoi7TV9vX9vDsJyWuZinq6SVvHPK9vIpW4qiRBUVtWJlgcHQaIw\nvviwFj3jJMvkax9/q70AVxl6jIP1xiRzBx4lDGHBnREWGv414YO/Di0Ww2+iva82\nIKDODh2QOTxzuIJwa5qC8fkgAMnlM2sIEIKPfTJpAoGBAIiw3DrjB2ZycpqAZiV5\n5eRYJlIwjKoQVt22IKixnz/FUywoSWP4EZinI/aqb/Bs5UwUv+hykKiuLxmOSAV1\nsJnkC60PGLtIFeuTyCW10NN+I5w8kHXS2c5h+5u+Bwa1oa12WJXe75vsAOp6ZLzs\nn4xnLQDkbZmV4aBRSZ1TGhkU\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@gang-war-2.iam.gserviceaccount.com",
+  "client_id": "112674574122828383073",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40gang-war-2.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
