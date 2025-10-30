@@ -1,5 +1,5 @@
 discord.py
-firebase
+pyrebase4
 pytz
 python-dateutil
 requests
