@@ -1,123 +1,205 @@
 import discord
 from discord.ext import commands, tasks
-import random
 import asyncio
-import requests
-from datetime import datetime, timedelta
-import pytz
-from config import BOT_TOKEN, FIREBASE_URL
+import random
+import json
+import os
+from firebase import firebase
+from config import BOT_TOKEN, FIREBASE_URL, OWNER_ID, DAILY_CHANNEL_ID, POLICE_ROLE_ID, MENTION_ROLE_ID
 
-# إعداد intents
+# إعداد النوايا (intents)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+firebase_app = firebase.FirebaseApplication(FIREBASE_URL, None)
 
-# إعداد المنطقة الزمنية (الرياض)
-riyadh_tz = pytz.timezone("Asia/Riyadh")
+# 🧩 دالة لحساب مستوى العصابة
+def calculate_level(points, rewards_levels):
+    level = 0
+    sorted_rewards = sorted(rewards_levels, key=lambda r: r.get("points", 0))
+    for reward in sorted_rewards:
+        if points >= reward.get("points", 0):
+            level = reward.get("level", 0)
+        else:
+            break
+    return level
 
-# تعريف المتغيرات العامة
-OWNER_ID = 949947235574095892  # ايدي المالك
-POLICE_ROLE_ID = 1342832610878951444  # رول الشرطة
-GANG_PING_ROLE_ID = 1342832658908057681  # رول العصابات
-MISSION_CHANNEL_ID = 1432630812137754715  # روم المهمات اليومية
-FIREBASE_PATH = f"{FIREBASE_URL}/gangs.json"
 
-# === الدوال المساعدة ===
-
-def get_gangs_data():
-    """جلب بيانات العصابات من Firebase"""
+# 🧠 جلب بيانات العصابات من Firebase
+def get_live_gang_data():
     try:
-        res = requests.get(FIREBASE_PATH)
-        if res.status_code == 200 and res.text.strip() != "null":
-            return res.json()
-        return {}
+        gangs_data = firebase_app.get("/gangs/list", None)
+        if not gangs_data:
+            print("⚠️ لا توجد بيانات عصابات.")
+            return {}, []
+        rewards_data = firebase_app.get("/rewards/levels", None)
+        rewards_levels = rewards_data if rewards_data else []
+        return gangs_data, rewards_levels
     except Exception as e:
-        print(f"Firebase Error: {e}")
-        return {}
+        print(f"⚠️ خطأ في Firebase: {e}")
+        return {}, []
 
-def update_gang_points(gang_name, points, reason):
-    """تحديث نقاط العصابة"""
-    data = get_gangs_data()
-    if gang_name in data:
-        gang_data = data[gang_name]
-        gang_data["points"] = gang_data.get("points", 0) + points
-        gang_data["last_reason"] = reason
-        requests.patch(FIREBASE_PATH, json={gang_name: gang_data})
-        return True
-    return False
 
-# === أوامر البوت ===
-
+# ✅ عند تشغيل البوت
 @bot.event
 async def on_ready():
-    print(f"✅ تم تشغيل البوت بنجاح باسم {bot.user}")
-    daily_mission.start()
+    print(f"✅ تم تسجيل الدخول باسم {bot.user}")
+    daily_task_loop.start()
 
-@bot.command()
-async def تجربة(ctx):
-    """اختبار المهمة اليومية بدون تأثير فعلي"""
+
+# 🏆 أمر عرض النقاط
+@bot.command(name="نقاط")
+async def show_points(ctx):
+    await ctx.send("📊 جاري جلب بيانات العصابات...")
+    gangs_data, rewards_levels = get_live_gang_data()
+    if not gangs_data:
+        await ctx.send("❌ لم أجد بيانات العصابات في Firebase.")
+        return
+
+    embed = discord.Embed(
+        title="🏆 ترتيب العصابات الحالي",
+        color=discord.Color.red()
+    )
+    for name, data in sorted(gangs_data.items(), key=lambda x: x[1].get("points", 0), reverse=True):
+        embed.add_field(
+            name=f"{name}",
+            value=f"**النقاط:** {data.get('points', 0)}\n**المستوى:** {calculate_level(data.get('points', 0), rewards_levels)}",
+            inline=True
+        )
+    await ctx.send(embed=embed)
+
+
+# 🔺 أمر إضافة نقاط (للمالك فقط)
+@bot.command(name="اضف")
+async def add_points(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
     if ctx.author.id != OWNER_ID:
-        return await ctx.send("❌ ما عندك صلاحية لاستخدام هذا الأمر.")
-    await send_mission(test_mode=True)
-    await ctx.send("✅ تمت تجربة المهمة بنجاح (بدون تأثير على البيانات).")
+        await ctx.send("❌ ليس لديك صلاحية.")
+        return
 
-@bot.command()
-async def قبض(ctx, *, gang_name: str = None):
-    """إكمال مهمة القبض"""
+    try:
+        gangs_data = firebase_app.get("/gangs/list", None)
+        if gang_name not in gangs_data:
+            await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
+            return
+
+        gangs_data[gang_name]["points"] += amount
+        gangs_data[gang_name].setdefault("recent_actions", []).insert(0, f"+{amount} {reason}")
+        firebase_app.put("/gangs/list", gang_name, gangs_data[gang_name])
+
+        await ctx.send(f"✅ تمت إضافة {amount} نقطة لعصابة **{gang_name}** بسبب: **{reason}**")
+    except Exception as e:
+        await ctx.send(f"⚠️ خطأ أثناء الإضافة: {e}")
+
+
+# 🔻 أمر خصم النقاط (للمالك فقط)
+@bot.command(name="خصم")
+async def remove_points(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
     if ctx.author.id != OWNER_ID:
-        return await ctx.send("❌ ما عندك صلاحية لاستخدام هذا الأمر.")
-    if not gang_name:
-        return await ctx.send("❗ استخدم الأمر بهذا الشكل: `!قبض اسم_العصابة`")
-    
-    updated = update_gang_points(gang_name, 30, "إكمال مهمة يومية")
-    if updated:
-        await ctx.send(f"✅ تمت إضافة 30 نقطة لعصابة **{gang_name}** بسبب إكمال المهمة اليومية!")
-    else:
-        await ctx.send("❌ العصابة غير موجودة في قاعدة البيانات!")
+        await ctx.send("❌ ليس لديك صلاحية.")
+        return
 
-# === نظام المهام اليومية ===
+    try:
+        gangs_data = firebase_app.get("/gangs/list", None)
+        if gang_name not in gangs_data:
+            await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
+            return
 
-@tasks.loop(minutes=60)
-async def daily_mission():
-    """تفعيل مهمة القبض اليومية في وقت عشوائي"""
-    now = datetime.now(riyadh_tz)
-    if 11 <= now.hour < 17:  # بين 11 صباحاً و5 العصر
-        # تأكد من أنها أول مرة فقط
-        if random.randint(1, 3) == 1:  # احتمال 1/3 لتفعيل المهمة
-            await send_mission()
+        gangs_data[gang_name]["points"] -= amount
+        gangs_data[gang_name].setdefault("recent_actions", []).insert(0, f"-{amount} {reason}")
+        firebase_app.put("/gangs/list", gang_name, gangs_data[gang_name])
 
-async def send_mission(test_mode=False):
-    """نشر مهمة القبض اليومية"""
-    guild = bot.guilds[0]
+        await ctx.send(f"✅ تم خصم {amount} نقطة من عصابة **{gang_name}** بسبب: **{reason}**")
+    except Exception as e:
+        await ctx.send(f"⚠️ خطأ أثناء الخصم: {e}")
+
+
+# 🎯 متغيرات المهمة اليومية
+current_target = None
+mission_active = False
+
+
+# 🎮 أمر تجربة المهمة (للمالك فقط)
+@bot.command(name="تجربة")
+async def test_daily(ctx):
+    if ctx.author.id != OWNER_ID:
+        await ctx.send("❌ ما عندك صلاحية.")
+        return
+    await start_daily_mission(ctx.guild, test_mode=True)
+
+
+# ⚡ أمر القبض
+@bot.command(name="قبض")
+async def complete_mission(ctx, gang_name: str):
+    global mission_active, current_target
+    if not mission_active or not current_target:
+        await ctx.send("❌ لا توجد مهمة نشطة حالياً.")
+        return
+
+    gangs_data = firebase_app.get("/gangs/list", None)
+    if gang_name not in gangs_data:
+        await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
+        return
+
+    gangs_data[gang_name]["points"] += 30
+    gangs_data[gang_name].setdefault("recent_actions", []).insert(0, f"+30 اكمال مهمة القبض اليومية")
+    firebase_app.put("/gangs/list", gang_name, gangs_data[gang_name])
+
+    mission_active = False
+    await ctx.send(f"🏅 العصابة **{gang_name}** أكملت مهمة اليوم بنجاح! (+30 نقطة)")
+    current_target = None
+
+
+# 🕐 مهمة القبض اليومية
+@tasks.loop(minutes=5)
+async def daily_task_loop():
+    now = discord.utils.utcnow().time()
+    if 8 <= now.hour <= 15:  # 11am to 5pm بتوقيت السعودية
+        if random.randint(1, 12) == 3:  # احتمال عشوائي
+            guilds = bot.guilds
+            for guild in guilds:
+                await start_daily_mission(guild)
+            await asyncio.sleep(3600)
+
+
+# ⚙️ إنشاء المهمة اليومية
+async def start_daily_mission(guild, test_mode=False):
+    global mission_active, current_target
+    if mission_active:
+        return
+
     police_role = guild.get_role(POLICE_ROLE_ID)
-    gang_role = guild.get_role(GANG_PING_ROLE_ID)
-    channel = guild.get_channel(MISSION_CHANNEL_ID)
-
-    if not (police_role and gang_role and channel):
-        print("⚠️ تأكد من صحة الآي ديهات الخاصة بالرولات والروم.")
+    if not police_role or not police_role.members:
         return
 
-    # اختيار شرطي عشوائي
-    police_members = [m for m in guild.members if police_role in m.roles]
-    if not police_members:
-        print("⚠️ لا يوجد أعضاء برتبة الشرطة.")
+    current_target = random.choice(police_role.members)
+    mission_active = True
+
+    channel = guild.get_channel(DAILY_CHANNEL_ID)
+    if not channel:
+        print("❌ لم يتم العثور على القناة.")
         return
 
-    target = random.choice(police_members)
     msg = await channel.send(
-        f"🚨 **مهمة القبض اليومية!** 🚨\n"
-        f"لدينا مهمة قبض اليوم!\n"
-        f"العصابة التي ستقبض على {target.mention} خلال ساعة من الآن 🔥 "
-        f"ستحصل على **30 نقطة**!\n\n"
-        f"{gang_role.mention}"
+        f"🚨 لدينا مهمة قبض {'(تجريبية)' if test_mode else 'جديدة'}!\n"
+        f"المطلوب: {current_target.mention}\n"
+        f"العصابة التي ستقبض عليه خلال ساعة ستحصل على **30 نقطة!**\n"
+        f"{guild.get_role(MENTION_ROLE_ID).mention}"
     )
 
-    if not test_mode:
-        # الانتظار لمدة ساعة
-        await asyncio.sleep(3600)
-        await channel.send("⌛ انتهى الوقت ولم يتم تنفيذ المهمة! المهمة **فشلت** ❌")
+    # بعد ساعة، فشل المهمة إن لم يتم إنهاؤها
+    await asyncio.sleep(3600)
+    if mission_active:
+        mission_active = False
+        await channel.send("⏰ انتهى الوقت! فشلت مهمة اليوم.")
+        current_target = None
 
-# تشغيل البوت
-bot.run(BOT_TOKEN)
+
+# 🚀 تشغيل البوت
+if __name__ == "__main__":
+    if not BOT_TOKEN:
+        print("⚠️ لم يتم العثور على توكن البوت. تأكد من وضعه في Secrets باسم DISCORD_BOT_TOKEN.")
+    else:
+        bot.run(BOT_TOKEN)
