@@ -119,6 +119,71 @@ async def show_gang_points(ctx):
     await ctx.send(embed=embed)
 
 if __name__ == '__main__':
+    # أمر لإضافة النقاط لعصابة
+@bot.command(name='اضف')
+async def add_points(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
+    # تحقق أن الشخص المرسل هو أنت فقط
+    if ctx.author.id != 949947235574095892:
+        await ctx.send("❌ ليس لديك صلاحية لاستخدام هذا الأمر.")
+        return
+
+    try:
+        from firebase import firebase
+        from config import FIREBASE_URL
+        firebase_app = firebase.FirebaseApplication(FIREBASE_URL, None)
+
+        # جلب بيانات العصابة
+        gangs_data = firebase_app.get('/gangs/list', None)
+
+        if gang_name not in gangs_data:
+            await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
+            return
+
+        # تحديث النقاط
+        gangs_data[gang_name]['points'] += amount
+
+        # حفظ السبب في قائمة الأحداث
+        if 'recent_actions' not in gangs_data[gang_name]:
+            gangs_data[gang_name]['recent_actions'] = []
+        gangs_data[gang_name]['recent_actions'].insert(0, f"+{amount} {reason}")
+
+        firebase_app.put('/gangs/list', gang_name, gangs_data[gang_name])
+
+        await ctx.send(f"✅ تمت إضافة **{amount}** نقطة لعصابة **{gang_name}** بسبب: **{reason}**")
+    except Exception as e:
+        await ctx.send(f"⚠️ حدث خطأ أثناء الإضافة: {e}")
+
+
+# أمر لخصم النقاط من العصابة
+@bot.command(name='خصم')
+async def remove_points(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
+    if ctx.author.id != 949947235574095892:
+        await ctx.send("❌ ليس لديك صلاحية لاستخدام هذا الأمر.")
+        return
+
+    try:
+        from firebase import firebase
+        from config import FIREBASE_URL
+        firebase_app = firebase.FirebaseApplication(FIREBASE_URL, None)
+
+        gangs_data = firebase_app.get('/gangs/list', None)
+
+        if gang_name not in gangs_data:
+            await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
+            return
+
+        # خصم النقاط
+        gangs_data[gang_name]['points'] -= amount
+
+        if 'recent_actions' not in gangs_data[gang_name]:
+            gangs_data[gang_name]['recent_actions'] = []
+        gangs_data[gang_name]['recent_actions'].insert(0, f"-{amount} {reason}")
+
+        firebase_app.put('/gangs/list', gang_name, gangs_data[gang_name])
+
+        await ctx.send(f"✅ تم خصم **{amount}** نقطة من عصابة **{gang_name}** بسبب: **{reason}**")
+    except Exception as e:
+        await ctx.send(f"⚠️ حدث خطأ أثناء الخصم: {e}")
     if BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         print("خطأ: يرجى تعديل ملف config.py وإضافة رمز البوت الخاص بك.")
     else:
