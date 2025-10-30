@@ -1,4 +1,5 @@
 discord.py
-firebase
-python-dateutil
+firebase_admin
+pytz
 requests
+python-dateutil
