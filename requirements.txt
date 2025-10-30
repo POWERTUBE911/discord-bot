@@ -1,5 +1,5 @@
-discord.py
+discord.py==2.4.0
 firebase_admin
 pytz
-requests
 python-dateutil
+requests
