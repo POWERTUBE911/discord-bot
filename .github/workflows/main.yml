@@ -1,7 +1,9 @@
-name: Run Discord Bot
+name: تشغيل بوت Discord
 
 on:
   push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -25,4 +27,6 @@ jobs:
     - name: Run bot
       env:
         DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-      run: python bot.py
+        FIREBASE_KEY: ${{ secrets.FIREBASE_KEY }}
+      run: |
+        python bot.py
