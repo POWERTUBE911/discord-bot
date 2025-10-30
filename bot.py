@@ -11,7 +11,7 @@ from firebase_admin import credentials, db
 from config import BOT_TOKEN
 
 # ================= إعداد Firebase =================
-cred = credentials.Certificate("serviceAccountKey.json")
+cred = credentials.Certificate("test.json")
 firebase_admin.initialize_app(cred, {
     'databaseURL': "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"
 })
