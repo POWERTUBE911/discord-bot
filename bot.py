@@ -49,7 +49,7 @@ def get_live_gang_data():
             rewards_levels = rewards_data
 
         processed_gangs = []
-        for gang in gangs_data:
+        for gang_key, gang in gangs_data.items():
             if isinstance(gang, dict):
                 gang_info = {
                     'name': gang.get('name', 'عصابة غير معروفة'),
@@ -111,17 +111,27 @@ async def add_points(ctx, amount: int, gang_name: str, *, reason: str = "بدو�
         firebase_app = firebase.FirebaseApplication(FIREBASE_URL, None)
         gangs_data = firebase_app.get('/gangs/list', None)
 
-        if gang_name not in gangs_data:
+        # البحث عن العصابة بالاسم داخل القيم
+        target_key = None
+        for key, gang in gangs_data.items():
+            if gang.get('name') == gang_name:
+                target_key = key
+                break
+
+        if not target_key:
             await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
             return
 
-        gangs_data[gang_name]['points'] += amount
+        # تحديث النقاط
+        gangs_data[target_key]['points'] += amount
 
-        if 'recent_actions' not in gangs_data[gang_name]:
-            gangs_data[gang_name]['recent_actions'] = []
-        gangs_data[gang_name]['recent_actions'].insert(0, f"+{amount} {reason}")
+        # تسجيل السبب
+        if 'recent_actions' not in gangs_data[target_key]:
+            gangs_data[target_key]['recent_actions'] = []
+        gangs_data[target_key]['recent_actions'].insert(0, f"+{amount} {reason}")
 
-        firebase_app.put('/gangs/list', gang_name, gangs_data[gang_name])
+        # رفع البيانات
+        firebase_app.put('/gangs/list', target_key, gangs_data[target_key])
 
         await ctx.send(f"✅ تمت إضافة **{amount}** نقطة لعصابة **{gang_name}** بسبب: **{reason}**")
 
@@ -140,17 +150,27 @@ async def remove_points(ctx, amount: int, gang_name: str, *, reason: str = "بد
         firebase_app = firebase.FirebaseApplication(FIREBASE_URL, None)
         gangs_data = firebase_app.get('/gangs/list', None)
 
-        if gang_name not in gangs_data:
+        # البحث عن العصابة بالاسم داخل القيم
+        target_key = None
+        for key, gang in gangs_data.items():
+            if gang.get('name') == gang_name:
+                target_key = key
+                break
+
+        if not target_key:
             await ctx.send(f"❌ العصابة '{gang_name}' غير موجودة.")
             return
 
-        gangs_data[gang_name]['points'] -= amount
+        # خصم النقاط
+        gangs_data[target_key]['points'] -= amount
 
-        if 'recent_actions' not in gangs_data[gang_name]:
-            gangs_data[gang_name]['recent_actions'] = []
-        gangs_data[gang_name]['recent_actions'].insert(0, f"-{amount} {reason}")
+        # تسجيل السبب
+        if 'recent_actions' not in gangs_data[target_key]:
+            gangs_data[target_key]['recent_actions'] = []
+        gangs_data[target_key]['recent_actions'].insert(0, f"-{amount} {reason}")
 
-        firebase_app.put('/gangs/list', gang_name, gangs_data[gang_name])
+        # رفع التعديل
+        firebase_app.put('/gangs/list', target_key, gangs_data[target_key])
 
         await ctx.send(f"✅ تم خصم **{amount}** نقطة من عصابة **{gang_name}** بسبب: **{reason}**")
 
