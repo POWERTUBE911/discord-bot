@@ -11,6 +11,7 @@ import os
 # ========== إعداد البوت ==========
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 OWNER_ID = 949947235574095892  # اكتب هنا ايديك
