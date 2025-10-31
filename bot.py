@@ -1,350 +1,215 @@
 # bot.py
-# بوت العصابات — تصميم دموي متحرك، كل الرسائل عربية، التوكن من Secrets
+import os
 import discord
 from discord.ext import commands, tasks
 import asyncio
+import json
 import requests
 import random
-import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 
-# ------------------ إعداد النوايا والبوت ------------------
+# ========== إعداد البوت ==========
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True  # مهم جداً لقراءة أعضاء الرتب
+intents.members = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ------------------ إعدادات ثابتة (عدل OWNER_ID لو تبي) ------------------
-# ملاحظة: التوكن فقط من الأسرار؛ باقي القيم ثابتة داخل الملف كما طلبت
-OWNER_ID = 949947235574095892  # لو تحب غيّر هنا
-POLICE_ROLE_ID = 1342832610878951444
-GANG_ROLE_ID = 1342832658908057681
-DAILY_CHANNEL_ID = 1432630812137754715
+# ======= إعدادات القيم الثابتة (حطها في Secrets/env) =======
+OWNER_ID = 949947235574095892  # مثال - عدل إن أردت
+POLICE_ROLE_ID = 1342832610878951444  # رتبة الشرطة
+GANG_ROLE_ID = 1342832658908057681    # رتبة العصابات (لذكرها عند المهمة)
+DAILY_CHANNEL_ID = 1432630812137754715  # قناة المهام اليومية
+FIREBASE_URL = "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"  # مثال: https://project-id-default-rtdb.europe-west1.firebasedatabase.app
+DAILY_REWARD_POINTS = 30  # نقاط المهمة اليومية
 
-# رابط Firebase ثابت داخل الكود (مثل ما طلبت)
-FIREBASE_URL = "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"
+if not FIREBASE_URL:
+    raise ValueError("لم يتم العثور على FIREBASE_URL في المتغيرات البيئية.")
 
-# نقاط المكافأة للمهمة اليومية
-DAILY_REWARD_POINTS = 30
-# المنطقة الزمنية لعرض التاريخ/الوقت
-TZ = "Asia/Riyadh"
+# ====================== دوال التعامل مع Firebase ======================
 
-# ------------------ مساعدة: حساب المستوى ------------------
-# نحاول تحميل مستويات من Firebase إن وُجدت، وإلا نستخدم thresholds محلية
-DEFAULT_LEVEL_THRESHOLDS = [
-    (0, 1),
-    (100, 2),
-    (250, 3),
-    (500, 4),
-    (1000, 5)
-]
-
-def load_rewards_levels_from_firebase():
-    try:
-        r = requests.get(f"{FIREBASE_URL}/rewards/levels.json", timeout=8)
-        if r.status_code == 200:
-            data = r.json()
-            # نتوقع قائمة عناصر بها fields 'points' و 'level'
-            if isinstance(data, list):
-                return sorted([(int(item.get("points", 0)), int(item.get("level", 0))) for item in data], key=lambda x: x[0])
-            if isinstance(data, dict):
-                # قد يكون dict مهيكل differently -> نقله للقائمة
-                arr = []
-                for _, v in data.items():
-                    if isinstance(v, dict):
-                        arr.append((int(v.get("points", 0)), int(v.get("level", 0))))
-                return sorted(arr, key=lambda x: x[0])
-    except Exception:
-        pass
-    return DEFAULT_LEVEL_THRESHOLDS
-
-LEVEL_THRESHOLDS = load_rewards_levels_from_firebase()
-
-def calculate_level(points: int) -> int:
-    lvl = 0
-    for thresh, level in LEVEL_THRESHOLDS:
-        if points >= thresh:
-            lvl = level
-        else:
-            break
-    return lvl
-
-# ------------------ دوال Firebase (تتعامل مع gangs/list كقائمة) ------------------
 def get_gangs_data():
     """
-    يرجع قائمة من القواميس: [{ "name": "...", "points": 0, ... }, ...]
-    يتعامل مع المسار /gangs/list.json
+    يجلب قائمة العصابات من /gangs/list.json
+    يعيد قائمة (list) أو [] عند الفشل
     """
     try:
-        resp = requests.get(f"{FIREBASE_URL}/gangs/list.json", timeout=8)
+        resp = requests.get(f"{FIREBASE_URL}/gangs/list.json")
         if resp.status_code == 200:
             data = resp.json()
+            # نتوقع قائمة؛ بعض قواعد قد ترجع dict أو None
             if isinstance(data, list):
                 return data
-            # في بعض الحالات قد يكون dict => نحول لقائمة values أو عناصر dict
-            if isinstance(data, dict):
-                # إذا العناصر أرقام مفهرسة كـ "0","1" نعيد القيم كقائمة
-                try:
-                    # محاولة استخراج قيم مرتبة
-                    keys = sorted([k for k in data.keys()], key=lambda x: int(x) if str(x).isdigit() else x)
-                    return [data[k] for k in keys]
-                except Exception:
-                    return list(data.values())
+            elif isinstance(data, dict):
+                # إن كانت dict بترتيب معين نحاول تحويلها لقائمة إن قابل
+                # لكن في هيكلك انت تظهر أن البيانات في شكل list بالفعل
+                # إذا أردت تحويل dict إلى list هنا قم بالتعديل
+                return list(data.values())
         else:
-            print(f"⚠️ فشل جلب gangs/list.json، status_code = {resp.status_code}")
+            print(f"⚠️ خطأ عند جلب العصابات من Firebase: {resp.status_code}")
     except Exception as e:
-        print(f"❌ استثناء عند جلب بيانات العصابات من Firebase: {e}")
+        print(f"⚠️ استثناء عند جلب العصابات: {e}")
     return []
 
-def put_full_gangs_list(gangs_list):
+def update_gangs_list(new_list):
     """
-    يكتب القائمة كلها إلى /gangs/list.json عبر PUT (نستخدم PUT لأن لدينا قائمة كاملة).
+    يكتب كامل قائمة العصابات إلى /gangs/list.json (PUT)
     """
     try:
-        resp = requests.put(f"{FIREBASE_URL}/gangs/list.json", json=gangs_list, timeout=8)
-        if resp.status_code not in (200, 204):
-            print(f"⚠️ فشل PUT للقائمة: {resp.status_code} - {resp.text}")
-            return False
-        return True
+        resp = requests.put(f"{FIREBASE_URL}/gangs/list.json", json=new_list)
+        return resp.status_code == 200
     except Exception as e:
-        print(f"❌ استثناء عند PUT للقائمة: {e}")
+        print(f"⚠️ استثناء عند تحديث قائمة العصابات: {e}")
         return False
 
-def update_gang_points(gang_name: str, new_points: int) -> bool:
+def update_gang_points(gang_name, new_points):
     """
-    يحدّث النقاط للعصابة بالاسم ضمن القائمة، ثم يرسل PUT للقائمة كلها.
+    يحدث نقاط العصابة ذات الاسم gang_name في القائمة.
+    يعيد True عند النجاح، False عند الفشل.
     """
-    try:
-        gangs = get_gangs_data()
-        changed = False
-        for item in gangs:
-            if item.get("name", "").strip().lower() == gang_name.strip().lower():
-                item["points"] = new_points
+    gangs = get_gangs_data()
+    changed = False
+    for g in gangs:
+        # افترض أن كل عنصر يحتوي على مفتاح 'name' و 'points'
+        try:
+            if g.get("name") == gang_name:
+                g["points"] = new_points
                 changed = True
                 break
-        if not changed:
-            # إذا لم نجد العصابة، يمكننا إضافتها (اختياري) - هنا نرجع False
-            return False
-        return put_full_gangs_list(gangs)
-    except Exception as e:
-        print(f"❌ خطأ في update_gang_points: {e}")
+        except Exception:
+            continue
+    if not changed:
+        print(f"⚠️ لم أجد عصابة بالاسم: {gang_name}")
         return False
+    success = update_gangs_list(gangs)
+    if not success:
+        print("⚠️ فشل تحديث البيانات في Firebase.")
+    return success
 
-def add_log(gang_name: str, action: str, reason: str):
+def add_log(gang_name, action, reason):
     """
-    يضيف سجلًا في /infoLog.json (POST).
+    يضيف سجل في infoLog أو infolog.json حسب هيكل القاعدة
+    (هنا نرسل POST إلى /infolog.json إذا كان متاح)
     """
+    log_entry = {
+        "gang": gang_name,
+        "action": action,
+        "reason": reason,
+        "timestamp": datetime.now(pytz.timezone("Asia/Riyadh")).isoformat()
+    }
     try:
-        entry = {
-            "gang": gang_name,
-            "action": action,
-            "reason": reason,
-            "time": datetime.now(pytz.timezone(TZ)).strftime("%Y-%m-%d %H:%M:%S")
-        }
-        requests.post(f"{FIREBASE_URL}/infoLog.json", json=entry, timeout=8)
+        requests.post(f"{FIREBASE_URL}/infoLog.json", json=log_entry)
     except Exception:
         pass
 
-# ------------------ تنسيق ورسائل متحركة (تدريجي) ------------------
-EMBED_COLOR_BORDER = 0x8B0000  # أحمر دموي
-GOLD_EMOJI = "🥇"
-SILVER_EMOJI = "🥈"
-BRONZE_EMOJI = "🥉"
-STYLE_SIGNATURE = "💀 **GANG BOT** ⚔️ — قانون العصابات لا يرحم"
-COMMON_EMOJIS = "💀 🔥 ⚔️"
-
-def make_base_embed(title: str, subtitle: str = None):
-    """
-    يبني Embed أساسي بستايل الدموي (غامق مع لون أحمر للحد).
-    نستخدم وصف (description) فارغ في البداية ليُملأ تدريجيًا.
-    """
-    embed = discord.Embed(title=title, description="", color=EMBED_COLOR_BORDER)
-    if subtitle:
-        embed.set_author(name=subtitle)
-    # توقيع في الفوتر
-    embed.set_footer(text=STYLE_SIGNATURE)
-    return embed
-
-async def send_progressive_embed(channel, title_lines, description_lines, pause=0.5):
-    """
-    يبعث embed فارغ أولًا ثم يضيف للأسفل سطرًا سطرًا من description_lines مع تأخير pause ثانية.
-    title_lines: list of title lines to appear at top (مُدمَجة في العنوان أو الحقل الأول)
-    description_lines: list of strings (each will be مضافة كسطر جديد)
-    """
-    # نحضر embed
-    title = "  ".join(title_lines) if title_lines else ""
-    embed = make_base_embed(title=title)
-    # نرسل رسالة مبدئية
-    msg = await channel.send(embed=embed)
-    # نبني وصف تدريجيًا
-    desc = ""
-    for line in description_lines:
-        desc += line + "\n"
-        embed.description = desc
-        try:
-            await msg.edit(embed=embed)
-        except Exception:
-            # في بعض الأحيان لا يسمح بالتعديل -> نتحدث برسالة جديدة بدل التعديل
-            await channel.send(line)
-        await asyncio.sleep(pause)
-    return msg
-
-# ------------------ الأوامر ------------------
+# ====================== أوامر العرض والتعامل ======================
 
 @bot.command(name="نقاط")
-async def cmd_points(ctx):
+async def show_points(ctx):
     """
-    يعرض العصابات مرتبة حسب النقاط، مع عرض المستوى لكل عصابة،
-    وتنسيق متحرك (سطر بسطر).
+    يعرض العصابات مرتبة حسب النقاط تنازلياً، مع الاسم، المستوى والنقاط.
+    الستايل أسود/أحمر كما طلبت.
     """
     gangs = get_gangs_data()
     if not gangs:
-        await ctx.send("❌ لم أتمكن من جلب بيانات العصابات الآن. حاول لاحقًا.")
+        await ctx.send("❌ لم يتم العثور على بيانات العصابات.")
         return
 
-    # نحسب المستوى لكل عصابة ثم نرتب
-    processed = []
-    for g in gangs:
-        name = g.get("name", "بدون اسم")
-        points = int(g.get("points", 0) or 0)
-        level = calculate_level(points)
-        processed.append({"name": name, "points": points, "level": level})
-    processed.sort(key=lambda x: x["points"], reverse=True)
+    # نتوقع قائمة. نرتبها حسب 'points' تنازليًا.
+    try:
+        sorted_gangs = sorted(gangs, key=lambda x: x.get("points", 0), reverse=True)
+    except Exception:
+        sorted_gangs = gangs
 
-    # بناء خطوط العرض
-    lines = []
-    rank_icons = [GOLD_EMOJI, SILVER_EMOJI, BRONZE_EMOJI]
-    for idx, g in enumerate(processed, start=1):
-        icon = rank_icons[idx-1] if idx-1 < len(rank_icons) else f"{idx}."
-        # خط لكل عصابة
-        line = f"{icon} **{g['name']}** — المستوى: **{g['level']}** — النقاط: **{g['points']}** {COMMON_EMOJIS}"
-        lines.append(line)
+    # نبني Embed أنيق (داكن) مع خطوط باللون الأحمر داخل الحقول
+    embed = discord.Embed(title="📊 عرض نقاط العصابات", color=discord.Color.dark_red())
+    embed.set_footer(text="الترتيب بحسب النقاط — آخر تحديث من القاعدة")
 
-    title_lines = ["🏴‍☠️  قائمة العصابات — الترتيب حسب النقاط"]
-    await send_progressive_embed(ctx.channel, title_lines, lines, pause=0.6)
+    # نضيف كل عصابة كحقل؛ نعرض المستوى والنقاط
+    for g in sorted_gangs:
+        name = g.get("name", "غير معروف")
+        points = g.get("points", 0)
+        level = g.get("level", 0)
+        # حقل بصيغة: المستوى 🔴 النقاط: 250
+        value = f"المستوى: **{level}**\nالنقاط: **{points}**"
+        embed.add_field(name=f"🔰 {name}", value=value, inline=False)
 
+    await ctx.send(embed=embed)
+
+# أمر إضافة نقاط (للمالك فقط)
 @bot.command(name="اضف")
-async def cmd_add(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
-    """
-    إضافة نقاط — خاص بالمالك فقط.
-    """
+async def add_points(ctx, amount: int, *, gang_name: str):
     if ctx.author.id != OWNER_ID:
-        await ctx.send("⚠️ ليس لديك صلاحية لاستخدام هذا الأمر.")
+        await ctx.send("⚠️ ليس لديك صلاحية استخدام هذا الأمر.")
         return
 
     gangs = get_gangs_data()
-    found = False
+    if not gangs:
+        await ctx.send("❌ لم أجد بيانات العصابات.")
+        return
+
     for g in gangs:
-        if g.get("name", "").strip().lower() == gang_name.strip().lower():
-            current = int(g.get("points", 0) or 0)
-            new = current + amount
-            ok = update_gang_points(gang_name, new)
-            if ok:
-                add_log(gang_name, f"إضافة {amount}", reason)
-                # تحضير سطور النتيجة
-                lines = [
-                    f"✅ تم إضافة **{amount}** نقطة إلى العصابة **{g['name']}**",
-                    f"🏆 المجموع الجديد: **{new}** نقطة",
-                    f"📋 السبب: {reason}",
-                    COMMON_EMOJIS
-                ]
-                await send_progressive_embed(ctx.channel, [f"💰 إضافة نقاط — {g['name']}"], lines, pause=0.5)
+        if g.get("name") == gang_name:
+            new_points = g.get("points", 0) + amount
+            g["points"] = new_points
+            success = update_gangs_list(gangs)
+            if success:
+                add_log(gang_name, f"اضافة {amount}", "أمر إداري")
+                await ctx.send(f"✅ تم إضافة {amount} نقطة إلى **{gang_name}** (الآن {new_points} نقطة).")
             else:
-                await ctx.send("❌ فشل تحديث النقاط في قاعدة البيانات.")
-            found = True
-            break
-    if not found:
-        await ctx.send("❌ لم أجد هذه العصابة في قاعدة البيانات.")
-
-@bot.command(name="خصم")
-async def cmd_remove(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
-    """
-    خصم نقاط — خاص بالمالك فقط.
-    """
-    if ctx.author.id != OWNER_ID:
-        await ctx.send("⚠️ ليس لديك صلاحية لاستخدام هذا الأمر.")
-        return
-
-    gangs = get_gangs_data()
-    found = False
-    for g in gangs:
-        if g.get("name", "").strip().lower() == gang_name.strip().lower():
-            current = int(g.get("points", 0) or 0)
-            new = max(0, current - amount)
-            ok = update_gang_points(gang_name, new)
-            if ok:
-                add_log(gang_name, f"خصم {amount}", reason)
-                lines = [
-                    f"⚠️ تم خصم **{amount}** نقطة من العصابة **{g['name']}**",
-                    f"🏆 المجموع الجديد: **{new}** نقطة",
-                    f"📋 السبب: {reason}",
-                    COMMON_EMOJIS
-                ]
-                await send_progressive_embed(ctx.channel, [f"🔻 خصم نقاط — {g['name']}"], lines, pause=0.5)
-            else:
-                await ctx.send("❌ فشل تحديث النقاط في قاعدة البيانات.")
-            found = True
-            break
-    if not found:
-        await ctx.send("❌ لم أجد هذه العصابة في قاعدة البيانات.")
-
-@bot.command(name="تجربة")
-async def cmd_trial(ctx):
-    """
-    تجربة اختيار شرطي عشوائي — لا تؤثر على المهمة اليومية الحقيقية.
-    مقصور على المالك (حسب طلبك السابق) — لكن يمكننا السماح للمالك فقط.
-    """
-    if ctx.author.id != OWNER_ID:
-        await ctx.send("⚠️ هذا الأمر مخصص لمالك البوت فقط.")
-        return
-
-    guild = ctx.guild
-    police_role = guild.get_role(POLICE_ROLE_ID)
-    gang_role = guild.get_role(GANG_ROLE_ID)
-    if not police_role:
-        await ctx.send("❌ لم أجد رتبة الشرطة. تأكد من إعدادات السيرفر.")
-        return
-    members = [m for m in police_role.members if not m.bot]
-    if not members:
-        await ctx.send("❌ لا يوجد أعضاء في رتبة الشرطة.")
-        return
-    chosen = random.choice(members)
-    lines = [
-        f"🧪 هذه مجرد تجربة — لا تؤثر على المهمة الحقيقية.",
-        f"👮‍♂️ الشرطي المختار: {chosen.mention}",
-        f"🔥 العصابات المستهدفة: {guild.get_role(GANG_ROLE_ID).mention if guild.get_role(GANG_ROLE_ID) else '‎🔰'}",
-        COMMON_EMOJIS
-    ]
-    await send_progressive_embed(ctx.channel, [f"🧪 تجربة مهمة يومية"], lines, pause=0.6)
-
-@bot.command(name="قبض")
-async def cmd_catch(ctx, gang_name: str):
-    """
-    إتمام القبض خلال ساعة المهمة — يعطي العصابة نقاط الجائزة.
-    فقط يسمح خلال المهمة — لكن هنا لا نعقّد: إذا نفّذ المالك الأمر أثناء المهمة (أو في أي وقت) سيتم التحقق.
-    """
-    # نتحقق إن العصابة موجودة
-    gangs = get_gangs_data()
-    for g in gangs:
-        if g.get("name", "").strip().lower() == gang_name.strip().lower():
-            current = int(g.get("points", 0) or 0)
-            new = current + DAILY_REWARD_POINTS
-            ok = update_gang_points(gang_name, new)
-            if ok:
-                add_log(gang_name, f"+{DAILY_REWARD_POINTS}", "إتمام المهمة اليومية")
-                lines = [
-                    f"🎉 أحسنت! العصابة **{g['name']}** نجحت في إتمام المهمة اليومية.",
-                    f"🏆 حصلت على **{DAILY_REWARD_POINTS}** نقطة! المجموع الآن: **{new}** نقطة",
-                    COMMON_EMOJIS
-                ]
-                await send_progressive_embed(ctx.channel, [f"🎯 مكافأة مهمة يومية — {g['name']}"], lines, pause=0.5)
-            else:
-                await ctx.send("❌ فشل تحديث النقاط في قاعدة البيانات.")
+                await ctx.send("❌ فشل في تحديث البيانات.")
             return
-    await ctx.send("❌ لم أجد هذه العصابة في قاعدة البيانات.")
 
-# ------------------ المهمة اليومية التلقائية ------------------
+    await ctx.send("❌ العصابة المطلوبة غير موجودة.")
+
+# أمر إزالة نقاط (للمالك فقط)
+@bot.command(name="نقص")
+async def remove_points(ctx, amount: int, *, gang_name: str):
+    if ctx.author.id != OWNER_ID:
+        await ctx.send("⚠️ ليس لديك صلاحية استخدام هذا الأمر.")
+        return
+
+    gangs = get_gangs_data()
+    if not gangs:
+        await ctx.send("❌ لم أجد بيانات العصابات.")
+        return
+
+    for g in gangs:
+        if g.get("name") == gang_name:
+            new_points = max(0, g.get("points", 0) - amount)
+            g["points"] = new_points
+            success = update_gangs_list(gangs)
+            if success:
+                add_log(gang_name, f"نقص {amount}", "أمر إداري")
+                await ctx.send(f"✅ تم خصم {amount} نقطة من **{gang_name}** (الآن {new_points} نقطة).")
+            else:
+                await ctx.send("❌ فشل في تحديث البيانات.")
+            return
+
+    await ctx.send("❌ العصابة المطلوبة غير موجودة.")
+
+# ====================== مهمة يومية (محدثة) ======================
+
+async def send_progressive_embed(channel, title_lines, body_lines, pause=0.5):
+    """
+    دالة مساعدة لإرسال 'انطباع متدرج' (محاكاة حركة) عبر تعديل embed.
+    سترسل Embed أولي ثم تعدّله لإعطاء تأثير متحرك.
+    """
+    embed = discord.Embed(title="\n".join(title_lines), color=discord.Color.dark_red())
+    embed.description = "\n".join(body_lines)
+    msg = await channel.send(embed=embed)
+    # هنا يمكن التعديل مرات لتوليد تأثير "متحرك" — لكن لا نريد سبام كثير على سيرفراتك
+    # فإذا أردت تأثير أكثر، زود عدد التكرارات أو عدّل pause.
+    await asyncio.sleep(pause)
+    # مثال تعديل خفيف (يمكن تعديله/حذفه)
+    try:
+        embed.set_footer(text=f"تم الإرسال: {datetime.now().strftime('%H:%M:%S')}")
+        await msg.edit(embed=embed)
+    except Exception:
+        pass
+    return msg
+
 @tasks.loop(hours=24)
 async def daily_mission():
     await asyncio.sleep(5)
@@ -352,45 +217,94 @@ async def daily_mission():
         print("⚠️ البوت غير متصل بأي سيرفر - المهمة اليومية متوقفة.")
         return
     guild = bot.guilds[0]
+
     police_role = guild.get_role(POLICE_ROLE_ID)
-    gang_role = guild.get_role(GANG_ROLE_ID)
+    gang_role = guild.get_role(GANG_ROLE_ID) if GANG_ROLE_ID else None
     channel = guild.get_channel(DAILY_CHANNEL_ID)
 
     if not police_role or not channel:
         print("⚠️ لم يتم العثور على رتبة الشرطة أو القناة اليومية. تحقق من الإعدادات.")
         return
-    if not gang_role:
-        print("⚠️ لم أجد رتبة العصابات (GANG_ROLE_ID).")
 
-    members = [m for m in police_role.members if not m.bot]
-    if not members:
-        await channel.send("❌ لا يوجد أعضاء في رتبة الشرطة حاليًا.")
+    police_members = [m for m in police_role.members if not m.bot]
+    if not police_members:
+        await channel.send("❌ لا يوجد أعضاء في رتبة الشرطة.")
         return
 
-    chosen = random.choice(members)
-    lines = [
-        f"🚨 بدأت المهمة اليومية الآن!",
-        f"👮‍♂️ الشرطي المكلف: {chosen.mention}",
-        f"🔥 العصابات: {gang_role.mention if gang_role else '‎🔰'}",
-        f"⏳ أمامكم ساعة واحدة للمحاولة — استخدموا `!قبض <اسم_العصابة>` لإتمام المهمة وكسب {DAILY_REWARD_POINTS} نقطة.",
-        COMMON_EMOJIS
-    ]
-    await send_progressive_embed(channel, [f"🚨 مهمة يومية جديدة"], lines, pause=0.6)
+    chosen = random.choice(police_members)
 
-    # ننتظر ساعة ثم نغلق المهمة (هذه مجرد رسالة انتهاء)
+    # الرسالة الجديدة كما طلبت (الجملة الأساسية)
+    lines = [
+        "🚨 **مهمة يومية جديدة!**",
+        "🔺 بدأت المهمة اليومية الآن!",
+        f"👮‍♂️ الشرطي المكلف: {chosen.mention}",
+        f"🔥 العصابات: {gang_role.mention if gang_role else '🔰'}",
+        f"⏳ **أمامكم ساعة واحدة اقبضوا على المطلوب لإتمام المهمة والحصول على {DAILY_REWARD_POINTS} نقطة!**",
+        "استخدموا الأمر: `!قبض <اسم_العصابة>` لإتمام المهمة."
+    ]
+    await send_progressive_embed(channel, ["🚨 مهمة يومية جديدة"], lines, pause=0.6)
+
+    # ننتظر ساعة ثم نغلق المهمة (رسالة انتهاء)
     await asyncio.sleep(3600)
     await channel.send("⌛ انتهت ساعة المهمة اليومية! انتهت المحاولة لهذه الدورة.")
 
-# ------------------ حدث التشغيل ------------------
+# أمر تجريبي لاختبار المهمة (يمكن استخدامه يدوياً)
+@bot.command(name="تجربة")
+async def test_daily(ctx):
+    guild = ctx.guild
+    police_role = guild.get_role(POLICE_ROLE_ID)
+    gang_role = guild.get_role(GANG_ROLE_ID) if GANG_ROLE_ID else None
+
+    police_members = [m for m in police_role.members if not m.bot] if police_role else []
+    if not police_role:
+        await ctx.send("❌ لم يتم العثور على رتبة الشرطة. تأكد من إعداد POLICE_ROLE_ID.")
+        return
+    if not police_members:
+        await ctx.send("❌ لا يوجد أعضاء في رتبة الشرطة.")
+        return
+
+    chosen = random.choice(police_members)
+    lines = [
+        "🚨 **مهمة يومية (تجريبية)!**",
+        f"👮‍♂️ الشرطي المكلف: {chosen.mention}",
+        f"🔥 العصابات: {gang_role.mention if gang_role else '🔰'}",
+        f"⏳ **أمامكم ساعة واحدة اقبضوا على المطلوب لإتمام المهمة والحصول على {DAILY_REWARD_POINTS} نقطة!**",
+        "استخدموا الأمر: `!قبض <اسم_العصابة>` لإتمام المهمة."
+    ]
+    await send_progressive_embed(ctx.channel, ["🚨 مهمة يومية (تجريبية)"], lines, pause=0.6)
+
+# أمر القبض على عصابة (تكسب نقاط)
+@bot.command(name="قبض")
+async def catch_gang(ctx, *, gang_name: str):
+    gangs = get_gangs_data()
+    if not gangs:
+        await ctx.send("❌ لم يتم العثور على بيانات العصابات.")
+        return
+
+    for g in gangs:
+        if g.get("name") == gang_name:
+            points = g.get("points", 0) + DAILY_REWARD_POINTS
+            g["points"] = points
+            success = update_gangs_list(gangs)
+            if success:
+                add_log(gang_name, f"+{DAILY_REWARD_POINTS}", "إتمام المهمة اليومية")
+                await ctx.send(f"✅ تم إتمام المهمة وخصصت **{DAILY_REWARD_POINTS}** نقطة لـ **{gang_name}**! الآن لديه **{points}** نقطة.")
+            else:
+                await ctx.send("❌ فشل في تحديث البيانات، حاول لاحقًا.")
+            return
+    await ctx.send("❌ العصابة المطلوبة غير موجودة.")
+
+# ====================== أحداث البوت ======================
+
 @bot.event
 async def on_ready():
-    print(f"✅ تم تسجيل الدخول كبوت: {bot.user} (ID: {bot.user.id})")
-    # شغّل المهمة اليومية إن لم تكن تعمل
+    print(f"✅ تم تسجيل الدخول كـ: {bot.user}")
     if not daily_mission.is_running():
         daily_mission.start()
 
-# ------------------ تشغيل البوت (توكن من الأسرار) ------------------
+# ====================== تشغيل البوت ======================
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 if not DISCORD_BOT_TOKEN:
-    raise ValueError("❌ متغير البيئة DISCORD_BOT_TOKEN غير موجود. ضع توكن البوت في الأسرار.")
+    raise ValueError("لم يتم العثور على DISCORD_BOT_TOKEN في المتغيرات البيئية (Secrets).")
+
 bot.run(DISCORD_BOT_TOKEN)
