@@ -173,10 +173,13 @@ async def on_ready():
     if not daily_mission.is_running():
         daily_mission.start()
 
-# =============== تشغيل البوت ===============
-DISCORD_BOT_TOKEN = "ضع_توكن_البوت_هنا"
+# ============ تشغيل البوت ============
+
+import os
+
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 if not DISCORD_BOT_TOKEN:
-    raise ValueError("❌ لم يتم العثور على توكن البوت!")
+    raise ValueError("❌ لم يتم العثور على التوكن في الأسرار (DISCORD_BOT_TOKEN)")
 
 bot.run(DISCORD_BOT_TOKEN)
