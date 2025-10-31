@@ -14,9 +14,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 OWNER_ID = 949947235574095892  # اكتب هنا ايديك
-POLICE_ROLE_ID = 1243660718079514444  # رتبة الشرطة
-GANG_ROLE_ID = 1324608938056078781   # رتبة العصابات (للتنبيه في المهمة)
-DAILY_CHANNEL_ID = 1342852921072457575  # روم المهمة اليومية
+POLICE_ROLE_ID = 1342832610878951444  # رتبة الشرطة
+GANG_ROLE_ID = 1342832658908057681   # رتبة العصابات (للتنبيه في المهمة)
+DAILY_CHANNEL_ID = 1432630812137754715  # روم المهمة اليومية
 FIREBASE_URL = "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"
 
 # ========== دوال Firebase ==========
