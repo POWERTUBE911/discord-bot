@@ -15,9 +15,10 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-OWNER_ID = 940904232574091589  # ضع هنا رقم الـ ID الخاص بك
-POLICE_ROLE_ID = 1243660718079514444
-DAILY_CHANNEL_ID = 1342852921072547575
+OWNER_ID = 940904232574091589  # ID المالك
+POLICE_ROLE_ID = 1243660718079514444  # رتبة الشرطة
+GANG_ROLE_ID = 1324860938056067871    # رتبة العصابة 🔥
+DAILY_CHANNEL_ID = 1342852921072547575  # روم المهام اليومية
 
 # ===========================
 # إعداد Firebase
@@ -33,11 +34,7 @@ def get_gangs_data():
         response = requests.get(f"{FIREBASE_URL}/gangs/list.json")
         if response.status_code == 200:
             data = response.json()
-            if isinstance(data, dict):
-                return data
-            else:
-                print("⚠️ البيانات في Firebase ليست بشكل صحيح.")
-                return {}
+            return data or {}
         else:
             print(f"⚠️ خطأ أثناء الاتصال بـ Firebase: {response.status_code}")
             return {}
@@ -67,8 +64,8 @@ def add_log(gang_name, action, reason):
     }
     try:
         requests.post(f"{FIREBASE_URL}/infoLog.json", json=log_entry)
-    except Exception as e:
-        print(f"⚠️ فشل إرسال السجل: {e}")
+    except:
+        pass
 
 # ===========================
 # أوامر البوت
@@ -81,14 +78,10 @@ async def show_points(ctx):
         await ctx.send("❌ لم يتم العثور على بيانات العصابات.")
         return
 
-    embed = discord.Embed(
-        title="📊 عرض نقاط العصابات",
-        color=discord.Color.red()
-    )
+    embed = discord.Embed(title="📊 عرض نقاط العصابات", color=discord.Color.red())
     for name, data in gangs.items():
         points = data.get("points", 0)
         embed.add_field(name=name, value=f"{points} نقطة", inline=False)
-
     await ctx.send(embed=embed)
 
 @bot.command(name="اضف")
@@ -118,24 +111,25 @@ async def remove_points(ctx, amount: int, gang_name: str, *, reason: str):
         await ctx.send("❌ العصابة غير موجودة.")
         return
 
-    new_points = max(gangs[gang_name].get("points", 0) - amount, 0)
+    new_points = max(0, gangs[gang_name].get("points", 0) - amount)
     update_gang_points(gang_name, new_points)
     add_log(gang_name, f"خصم {amount}", reason)
     await ctx.send(f"✅ تم خصم {amount} من **{gang_name}** (السبب: {reason})")
 
 # ===========================
-# المهمة اليومية
+# المهمة اليومية التلقائية
 # ===========================
 
 @tasks.loop(hours=24)
 async def daily_mission():
-    await asyncio.sleep(3)
+    await asyncio.sleep(5)
     guild = bot.guilds[0]
     police_role = guild.get_role(POLICE_ROLE_ID)
+    gang_role = guild.get_role(GANG_ROLE_ID)
     channel = guild.get_channel(DAILY_CHANNEL_ID)
 
-    if not police_role or not channel:
-        print("❌ لم يتم العثور على رتبة الشرطة أو الروم المحدد.")
+    if not police_role or not gang_role or not channel:
+        print("⚠️ لم يتم العثور على الأدوار أو القناة المحددة.")
         return
 
     police_members = [m for m in police_role.members if not m.bot]
@@ -144,19 +138,24 @@ async def daily_mission():
         return
 
     chosen = random.choice(police_members)
-    await channel.send(f"🚨 المهمة اليومية بدأت! تم اختيار {chosen.mention} لتنفيذ المهمة أمامه ساعة واحدة ⏰")
-    await asyncio.sleep(3600)
-    await channel.send("⏳ انتهى وقت المهمة اليومية!")
+    await channel.send(
+        f"🚨 **بدات المهمة اليومية!**\n"
+        f"👮‍♂️ الشرطي: {chosen.mention}\n"
+        f"💀 العصابات: {gang_role.mention}\n"
+        f"⏰ أمامكم ساعة واحدة لتنفيذ المهمة!"
+    )
 
+    await asyncio.sleep(3600)
+    await channel.send("⌛ **انتهى وقت المهمة اليومية!**")
+
+# ===========================
+# أمر تجربة المهمة اليومية
+# ===========================
 @bot.command(name="تجربة")
 async def test_daily(ctx):
     guild = ctx.guild
     police_role = guild.get_role(POLICE_ROLE_ID)
-    channel = ctx.channel
-
-    if not police_role:
-        await ctx.send("❌ لم يتم العثور على رتبة الشرطة.")
-        return
+    gang_role = guild.get_role(GANG_ROLE_ID)
 
     police_members = [m for m in police_role.members if not m.bot]
     if not police_members:
@@ -164,8 +163,15 @@ async def test_daily(ctx):
         return
 
     chosen = random.choice(police_members)
-    await ctx.send(f"🎯 تم اختيار {chosen.mention} (تجربة فقط).")
+    await ctx.send(
+        f"🧪 **اختبار المهمة اليومية** (تجربة فقط)\n"
+        f"👮‍♂️ الشرطي: {chosen.mention}\n"
+        f"💀 العصابات: {gang_role.mention}"
+    )
 
+# ===========================
+# أمر القبض (المهام اليومية)
+# ===========================
 @bot.command(name="قبض")
 async def catch_gang(ctx, gang_name: str):
     gangs = get_gangs_data()
@@ -173,18 +179,17 @@ async def catch_gang(ctx, gang_name: str):
         await ctx.send("❌ العصابة غير موجودة.")
         return
 
-    new_points = gangs[gang_name].get("points", 0) + 30
-    update_gang_points(gang_name, new_points)
-    add_log(gang_name, "إتمام المهمة اليومية", "إضافة 30 نقطة للمهمة اليومية")
-    await ctx.send(f"✅ تمت إضافة 30 نقطة إلى **{gang_name}** لإتمام المهمة اليومية!")
+    points = gangs[gang_name].get("points", 0) + 30
+    update_gang_points(gang_name, points)
+    add_log(gang_name, "إتمام المهمة اليومية", "تم القبض بنجاح")
+    await ctx.send(f"✅ **{gang_name}** أكملت المهمة اليومية وحصلت على 30 نقطة 🎉")
 
 # ===========================
 # عند تشغيل البوت
 # ===========================
-
 @bot.event
 async def on_ready():
-    print(f"✅ تم تسجيل الدخول كبوت {bot.user}")
+    print(f"✅ تم تسجيل الدخول كـ {bot.user}")
     if not daily_mission.is_running():
         daily_mission.start()
 
@@ -194,6 +199,6 @@ async def on_ready():
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 if not DISCORD_BOT_TOKEN:
-    raise ValueError("❌ لم يتم العثور على التوكن في الأسرار (DISCORD_BOT_TOKEN)")
+    raise ValueError("❌ لم يتم العثور على التوكن في Secrets (DISCORD_BOT_TOKEN)")
 
 bot.run(DISCORD_BOT_TOKEN)
