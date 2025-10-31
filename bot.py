@@ -2,152 +2,98 @@ import discord
 from discord.ext import commands, tasks
 import asyncio
 import json
-import random
 import os
+import requests
+import random
 import pytz
-import firebase_admin
-from firebase_admin import credentials, db
 
-# ============================
-# 🔐 تحميل مفاتيح Secrets
-# ============================
-firebase_key_json = os.getenv("FIREBASE_KEY")
-if not firebase_key_json:
-    raise ValueError("❌ لم يتم العثور على FIREBASE_KEY في إعدادات Secrets")
-
-try:
-    cred_dict = json.loads(firebase_key_json)
-except json.JSONDecodeError as e:
-    raise ValueError(f"❌ خطأ في JSON الخاص بـ FIREBASE_KEY: {e}")
-
-cred = credentials.Certificate(cred_dict)
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://gang-war-2-default-rtdb.firebaseio.com/'
-})
-
-# ============================
-# ⚙️ إعدادات البوت
-# ============================
+# ============ إعداد Discord Bot ============
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-OWNER_ID = 940049325734091589
-POLICE_ROLE_ID = 1243268120897851144
-GANG_ROLE_ID = 1348293088056806781
-DAILY_CHANNEL_ID = 1348300631201752745
+OWNER_ID = 940094235374091589
+POLICE_ROLE_ID = 1243268210878951444
+GANG_ROLE_ID = 1342868930865067871
+DAILY_CHANNEL_ID = 1342852920172574755
 
-mission_active = False
-current_target = None
+# ============ إعداد Firebase (بدون مفتاح) ============
+firebase_url = os.getenv("FIREBASE_URL")
+if not firebase_url:
+    raise ValueError("❌ لم يتم العثور على FIREBASE_URL في إعدادات GitHub!")
 
-# ============================
-# 📦 Firebase Utility
-# ============================
 def get_gangs_data():
-    ref = db.reference("gangs/list")
-    data = ref.get()
-    return data if data else {}
+    try:
+        response = requests.get(f"{firebase_url}/gangs/list.json")
+        if response.status_code == 200:
+            data = response.json()
+            return data if data else {}
+        else:
+            print(f"⚠️ خطأ في الاتصال بـ Firebase: {response.status_code}")
+            return {}
+    except Exception as e:
+        print(f"⚠️ فشل في جلب البيانات من Firebase: {e}")
+        return {}
 
-# ============================
-# 💬 الأوامر
-# ============================
+def update_gang_points(gang_name, points):
+    try:
+        response = requests.patch(f"{firebase_url}/gangs/list/{gang_name}.json", json={"points": points})
+        return response.status_code == 200
+    except Exception as e:
+        print(f"⚠️ خطأ في تحديث النقاط: {e}")
+        return False
 
-@bot.command(name="نقاط")
+# ============ أوامر البوت ============
+@bot.command(name="النقاط")
 async def show_points(ctx):
     gangs = get_gangs_data()
     if not gangs:
-        await ctx.send("❌ لم يتم العثور على بيانات العصابات")
+        await ctx.send("❌ لم يتم العثور على بيانات العصابات.")
         return
 
-    embed = discord.Embed(title="🏴‍☠️ نقاط العصابات", color=discord.Color.red())
-    for gang_id, gang_data in gangs.items():
-        name = gang_data.get("name", "بدون اسم")
+    embed = discord.Embed(title="📊 عرض نقاط العصابات", color=discord.Color.red())
+    for gang_name, gang_data in gangs.items():
         points = gang_data.get("points", 0)
-        embed.add_field(name=name, value=f"**النقاط:** {points}", inline=False)
-
+        embed.add_field(name=gang_name, value=f"نقاط: **{points}**", inline=False)
     await ctx.send(embed=embed)
 
-@bot.command(name="اضف")
-async def add_points(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
+@bot.command(name="اضافة")
+async def add_points(ctx, gang_name: str, amount: int):
     if ctx.author.id != OWNER_ID:
-        await ctx.send("⚠️ ليس لديك صلاحية استخدام هذا الأمر.")
+        await ctx.send("⚠️ ليس لديك صلاحية لاستخدام هذا الأمر.")
         return
 
     gangs = get_gangs_data()
-    target_ref = None
-
-    for gid, data in gangs.items():
-        if data.get("name") == gang_name:
-            target_ref = db.reference(f"gangs/list/{gid}")
-            break
-
-    if not target_ref:
-        await ctx.send("❌ العصابة غير موجودة.")
+    if gang_name not in gangs:
+        await ctx.send("❌ لم يتم العثور على العصابة المحددة.")
         return
 
-    current_points = target_ref.child("points").get() or 0
-    target_ref.update({"points": current_points + amount})
-
-    embed = discord.Embed(title="✅ تم إضافة نقاط", color=discord.Color.green())
-    embed.add_field(name="العصابة", value=gang_name, inline=True)
-    embed.add_field(name="النقاط المضافة", value=str(amount), inline=True)
-    embed.add_field(name="السبب", value=reason, inline=False)
-    await ctx.send(embed=embed)
+    new_points = gangs[gang_name].get("points", 0) + amount
+    update_gang_points(gang_name, new_points)
+    await ctx.send(f"✅ تم إضافة {amount} نقطة إلى العصابة {gang_name}. المجموع الآن: {new_points}")
 
 @bot.command(name="خصم")
-async def remove_points(ctx, amount: int, gang_name: str, *, reason: str = "بدون سبب"):
+async def remove_points(ctx, gang_name: str, amount: int):
     if ctx.author.id != OWNER_ID:
-        await ctx.send("⚠️ ليس لديك صلاحية استخدام هذا الأمر.")
+        await ctx.send("⚠️ ليس لديك صلاحية لاستخدام هذا الأمر.")
         return
 
     gangs = get_gangs_data()
-    target_ref = None
-
-    for gid, data in gangs.items():
-        if data.get("name") == gang_name:
-            target_ref = db.reference(f"gangs/list/{gid}")
-            break
-
-    if not target_ref:
-        await ctx.send("❌ العصابة غير موجودة.")
+    if gang_name not in gangs:
+        await ctx.send("❌ لم يتم العثور على العصابة المحددة.")
         return
 
-    current_points = target_ref.child("points").get() or 0
-    target_ref.update({"points": max(0, current_points - amount)})
+    new_points = max(0, gangs[gang_name].get("points", 0) - amount)
+    update_gang_points(gang_name, new_points)
+    await ctx.send(f"✅ تم خصم {amount} نقطة من العصابة {gang_name}. المجموع الآن: {new_points}")
 
-    embed = discord.Embed(title="📉 تم خصم نقاط", color=discord.Color.orange())
-    embed.add_field(name="العصابة", value=gang_name, inline=True)
-    embed.add_field(name="النقاط المخصومة", value=str(amount), inline=True)
-    embed.add_field(name="السبب", value=reason, inline=False)
-    await ctx.send(embed=embed)
-
-# ============================
-# 💣 أمر القبض
-# ============================
-@bot.command(name="قبض")
-async def arrest(ctx):
-    await ctx.send("🚓 تمت عملية القبض بنجاح!")
-
-# ============================
-# 🧪 أمر تجربة
-# ============================
-@bot.command(name="تجربة")
-async def test(ctx):
-    await ctx.send("✅ البوت شغال تمام!")
-
-# ============================
-# 🎯 تشغيل البوت
-# ============================
 @bot.event
 async def on_ready():
-    print(f"✅ تم تسجيل الدخول باسم: {bot.user}")
-    print("⚡ البوت جاهز للعمل.")
+    print(f"✅ تم تسجيل الدخول كبوت: {bot.user}")
 
-# ============================
-# 🚀 التشغيل
-# ============================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise ValueError("❌ لم يتم العثور على BOT_TOKEN في Secrets")
+# ============ تشغيل البوت ============
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+if not DISCORD_BOT_TOKEN:
+    raise ValueError("❌ لم يتم العثور على DISCORD_BOT_TOKEN في إعدادات GitHub!")
 
-bot.run(BOT_TOKEN)
+bot.run(DISCORD_BOT_TOKEN)
