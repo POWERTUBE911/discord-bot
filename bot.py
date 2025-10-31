@@ -19,7 +19,7 @@ GANG_ROLE_ID = 1324860938056067871
 DAILY_CHANNEL_ID = 1342852921072547575
 
 # ================= إعداد Firebase =================
-FIREBASE_URL = os.getenv("FIREBASE_URL")
+FIREBASE_URL = "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"
 
 if not FIREBASE_URL:
     raise ValueError("❌ لم يتم العثور على FIREBASE_URL في إعدادات الأسرار")
