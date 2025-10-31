@@ -13,19 +13,25 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ================= إعداد ثابتات =================
-OWNER_ID = 940090234570191589  # آيدي المالك
-POLICE_ROLE_ID = 1243660218798514444  # رتبة الشرطة
-GANG_ROLE_ID = 123480639805670871  # رتبة العصابات
-DAILY_CHANNEL_ID = 134282590127547555  # روم المهمات اليومية
-FIREBASE_URL = "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"  # رابط Firebase
+# ================= إعداد القيم =================
+OWNER_ID = 940090423574091589   # 🧑‍💼 مالك البوت
+POLICE_ROLE_ID = 1243662018789514444  # 🚓 رتبة الشرطة
+GANG_ROLE_ID = 132480693805667871  # 🕵️‍♂️ رتبة العصابات
+DAILY_CHANNEL_ID = 134285920125747555  # 💬 روم المهام اليومية
 
-# ================= دوال Firebase =================
+# ================= إعداد Firebase =================
+FIREBASE_URL = "https://gang-war-2-default-rtdb.europe-west1.firebasedatabase.app"
+
+# ================= دوال المساعدة =================
 def get_gangs_data():
     try:
         response = requests.get(f"{FIREBASE_URL}/gangs.json")
         if response.status_code == 200:
-            return response.json() or {}
+            data = response.json() or {}
+            # تحويل القائمة إلى قاموس لو كانت البيانات list
+            if isinstance(data, list):
+                data = {f"gang_{i+1}": g for i, g in enumerate(data) if isinstance(g, dict)}
+            return data
         else:
             print(f"⚠️ خطأ أثناء الاتصال بـ Firebase: {response.status_code}")
             return {}
@@ -35,10 +41,10 @@ def get_gangs_data():
 
 def update_gang_points(gang_name, points):
     try:
-        response = requests.patch(f"{FIREBASE_URL}/gangs/{gang_name}.json", json={"points": points})
-        return response.status_code == 200
+        requests.patch(f"{FIREBASE_URL}/gangs/{gang_name}.json", json={"points": points})
+        return True
     except Exception as e:
-        print(f"⚠️ خطأ أثناء تحديث النقاط: {e}")
+        print(f"⚠️ خطأ في تحديث نقاط العصابة: {e}")
         return False
 
 def add_log(gang_name, action, reason):
@@ -46,14 +52,14 @@ def add_log(gang_name, action, reason):
         "gang": gang_name,
         "action": action,
         "reason": reason,
-        "timestamp": datetime.now(pytz.timezone("Asia/Riyadh")).strftime("%Y-%m-%d %H:%M:%S")
+        "time": datetime.now(pytz.timezone("Asia/Riyadh")).strftime("%Y-%m-%d %H:%M:%S")
     }
     try:
         requests.post(f"{FIREBASE_URL}/infoLog.json", json=log_entry)
-    except Exception as e:
-        print(f"⚠️ خطأ أثناء تسجيل الحدث: {e}")
+    except:
+        pass
 
-# ================= أوامر البوت =================
+# ================= الأوامر =================
 @bot.command(name="نقاط")
 async def show_points(ctx):
     gangs = get_gangs_data()
@@ -61,10 +67,11 @@ async def show_points(ctx):
         await ctx.send("❌ لم يتم العثور على بيانات العصابات.")
         return
 
-    embed = discord.Embed(title="📊 عرض نقاط العصابات", color=discord.Color.red())
+    embed = discord.Embed(title="📊 نقاط العصابات", color=discord.Color.blue())
     for gang, data in gangs.items():
         points = data.get("points", 0)
-        embed.add_field(name=gang, value=f"**{points} نقطة**", inline=False)
+        embed.add_field(name=gang, value=f"🔹 {points} نقطة", inline=False)
+
     await ctx.send(embed=embed)
 
 @bot.command(name="اضف")
@@ -80,8 +87,8 @@ async def add_points(ctx, amount: int, gang_name: str, *, reason: str):
 
     new_points = gangs[gang_name].get("points", 0) + amount
     update_gang_points(gang_name, new_points)
-    add_log(gang_name, f"إضافة {amount} نقطة", reason)
-    await ctx.send(f"✅ تم إضافة {amount} نقطة إلى عصابة **{gang_name}** 🎯 السبب: {reason}")
+    add_log(gang_name, f"+{amount}", reason)
+    await ctx.send(f"✅ تمت إضافة **{amount}** نقطة إلى **{gang_name}** بسبب: {reason}")
 
 @bot.command(name="خصم")
 async def remove_points(ctx, amount: int, gang_name: str, *, reason: str):
@@ -96,10 +103,10 @@ async def remove_points(ctx, amount: int, gang_name: str, *, reason: str):
 
     new_points = max(gangs[gang_name].get("points", 0) - amount, 0)
     update_gang_points(gang_name, new_points)
-    add_log(gang_name, f"خصم {amount} نقطة", reason)
-    await ctx.send(f"⚠️ تم خصم {amount} نقطة من عصابة **{gang_name}** ⛔ السبب: {reason}")
+    add_log(gang_name, f"-{amount}", reason)
+    await ctx.send(f"✅ تم خصم **{amount}** نقطة من **{gang_name}** بسبب: {reason}")
 
-# ================= المهمة اليومية =================
+# ================= المهام اليومية =================
 @tasks.loop(hours=24)
 async def daily_mission():
     await asyncio.sleep(3)
@@ -108,31 +115,33 @@ async def daily_mission():
     channel = guild.get_channel(DAILY_CHANNEL_ID)
 
     if not police_role or not channel:
-        print("❌ لم يتم العثور على رتبة الشرطة أو القناة اليومية.")
+        print("❌ لم يتم العثور على رتبة الشرطة أو الروم المحدد.")
         return
 
     police_members = [m for m in police_role.members if not m.bot]
     if not police_members:
-        await channel.send("🚫 لا يوجد أفراد شرطة حالياً.")
+        await channel.send("❌ لا يوجد أعضاء في رتبة الشرطة.")
         return
 
     chosen = random.choice(police_members)
-    await channel.send(f"🚨 بدأت المهمة اليومية! الشرطي المختار اليوم هو: {chosen.mention}")
+    await channel.send(f"🚨 **بدأت المهمة اليومية!**\nالضابط المختار اليوم هو: {chosen.mention}.\nلديكم ساعة واحدة فقط لتنفيذ المهام!")
+
     await asyncio.sleep(3600)
-    await channel.send("⌛ انتهى وقت المهمة اليومية! لم يتم تنفيذ القبض بعد 😢")
+    await channel.send("⌛ انتهى وقت المهمة اليومية.")
 
 @bot.command(name="تجربة")
 async def test_daily(ctx):
     guild = ctx.guild
     police_role = guild.get_role(POLICE_ROLE_ID)
-    police_members = [m for m in police_role.members if not m.bot]
+    channel = ctx.channel
 
+    police_members = [m for m in police_role.members if not m.bot]
     if not police_members:
-        await ctx.send("🚫 لا يوجد أفراد شرطة حالياً.")
+        await ctx.send("❌ لا يوجد أفراد شرطة.")
         return
 
     chosen = random.choice(police_members)
-    await ctx.send(f"🎯 (تجربة فقط) الشرطي المختار هو: {chosen.mention}")
+    await ctx.send(f"🧪 تجربة المهمة اليومية: تم اختيار {chosen.mention} (اختبار فقط).")
 
 @bot.command(name="قبض")
 async def catch_gang(ctx, gang_name: str):
@@ -143,20 +152,19 @@ async def catch_gang(ctx, gang_name: str):
 
     points = gangs[gang_name].get("points", 0) + 30
     update_gang_points(gang_name, points)
-    add_log(gang_name, "إنهاء المهمة اليومية", "إتمام القبض")
-    await ctx.send(f"🎉 العصابة **{gang_name}** أنجزت المهمة اليومية بنجاح وتمت مكافأتها بـ 30 نقطة! 🔥")
+    add_log(gang_name, "+30", "إتمام المهمة اليومية")
+    await ctx.send(f"🎯 العصابة **{gang_name}** أكملت المهمة اليومية بنجاح! حصلت على **30** نقطة 💰")
 
 # ================= تشغيل البوت =================
 @bot.event
 async def on_ready():
-    print(f"✅ تم تسجيل الدخول باسم {bot.user}")
+    print(f"✅ تم تسجيل الدخول بنجاح باسم: {bot.user}")
     if not daily_mission.is_running():
         daily_mission.start()
 
-# 🔹 توكن البوت من الأسرار فقط 🔹
+# التوكن من أسرار GitHub
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-
 if not DISCORD_BOT_TOKEN:
-    raise ValueError("❌ لم يتم العثور على توكن البوت في الأسرار!")
+    raise ValueError("❌ لم يتم العثور على متغير DISCORD_BOT_TOKEN في الأسرار.")
 
 bot.run(DISCORD_BOT_TOKEN)
