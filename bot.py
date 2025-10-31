@@ -13,7 +13,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-OWNER_ID = 949004327547091589  # اكتب هنا ايديك
+OWNER_ID = 949947235574095892  # اكتب هنا ايديك
 POLICE_ROLE_ID = 1243660718079514444  # رتبة الشرطة
 GANG_ROLE_ID = 1324608938056078781   # رتبة العصابات (للتنبيه في المهمة)
 DAILY_CHANNEL_ID = 1342852921072457575  # روم المهمة اليومية
