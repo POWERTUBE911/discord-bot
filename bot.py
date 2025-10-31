@@ -14,7 +14,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # =============== الإعدادات ===============
-OWNER_ID = 94009432574091589
+OWNER_ID = 949947235574095892
 POLICE_ROLE_ID = 1243660128709514444
 GANG_ROLE_ID = 1324860938056067871
 DAILY_CHANNEL_ID = 134285290127054755
