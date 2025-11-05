@@ -293,7 +293,91 @@ async def catch_gang(ctx, *, gang_name: str):
                 await ctx.send("❌ فشل في تحديث البيانات، حاول لاحقًا.")
             return
     await ctx.send("❌ العصابة المطلوبة غير موجودة.")
+# إضافة أمر حظر آمن - ضع هذا عند باقي الأوامر في bot.py
 
+@bot.command(name='حظر')
+async def ban_cmd(ctx, target: str, *, reason: str = "No reason provided"):
+    """
+    أمر حظر يشتغل فقط لمن ايديه مطابق لـ OWNER_ID.
+    الاستخدام: !حظر <@user|user_id> [السبب]
+    """
+    # تحقق أن من يستدعي الأمر هو المصرح (أنت)
+    try:
+        if ctx.author.id != OWNER_ID:949947235574095892
+            await ctx.reply("❌ ليس لديك صلاحية استخدام هذا الأمر.", mention_author=False)
+            return
+    except Exception:
+        await ctx.reply("❌ خطأ في التحقق من هوية المستخدم.", mention_author=False)
+        return
+
+    # يجب أن يكون الأمر داخل سيرفر
+    if not ctx.guild:
+        await ctx.reply("❌ هذا الأمر يمكن استخدامه فقط داخل السيرفر.", mention_author=False)
+        return
+
+    # تحقق من أن البوت يملك صلاحية الحظر
+    bot_member = ctx.guild.get_member(bot.user.id)
+    if not bot_member:
+        bot_member = await ctx.guild.fetch_member(bot.user.id)
+    if not bot_member.guild_permissions.ban_members:
+        await ctx.reply("❌ ليس لدي صلاحية `Ban Members`. اعطني الإذن ثم جرّب مرة أخرى.", mention_author=False)
+        return
+
+    # استخراج ID من مِنشن أو نص
+    target_id_str = target.strip('<@!>')
+    if not target_id_str.isdigit():
+        await ctx.reply("❌ الرجاء تمرير مِنع أو معرف مستخدم صالح.", mention_author=False)
+        return
+    target_id = int(target_id_str)
+
+    # إذا الهدف موجود داخل السيرفر - نحاول جلب العضو والتحقق من المرتبة
+    member = None
+    try:
+        member = await ctx.guild.fetch_member(target_id)
+    except discord.NotFound:
+        member = None
+    except Exception:
+        member = None
+
+    # لا يمكن حظر مالك السيرفر
+    if member and member.id == ctx.guild.owner_id:
+        await ctx.reply("❌ لا أستطيع حظر مالك السيرفر. تواصل مع Discord Trust & Safety.", mention_author=False)
+        return
+
+    # إذا العضو موجود، تحقق ترتيب الأدوار (role hierarchy)
+    if member:
+        if member.top_role >= bot_member.top_role:
+            await ctx.reply("❌ لا أستطيع حظر هذا العضو لأن رتبة هدف الحظر أعلى أو مساوية لرتبتي.", mention_author=False)
+            return
+
+    # رسالة DM للهدف (نحاول، وإذا فشل نتابع الحظر)
+    BAN_MESSAGE = "تم حظرك من عمك مجنون 🇲🇦"
+    try:
+        user_obj = await bot.fetch_user(target_id)
+        try:
+            await user_obj.send(f"{BAN_MESSAGE}\n\nسبب الحظر: {reason}")
+        except Exception:
+            # فشل الإرسال لا يمنع الحظر
+            pass
+    except Exception:
+        # لو ما قدرنا نجيب اليوزر، نمضي للأمر ونجرب الحظر بفشل واضح لو صار
+        user_obj = None
+
+    # تنفيذ الحظر
+    try:
+        await ctx.guild.ban(discord.Object(id=target_id), reason=f"By {ctx.author} - {reason}")
+        # إن كان عندك دالة add_log(gang_name, action, reason) استخدمها هنا
+        try:
+            add_log(str(ctx.author), "ban", f"Target: {target_id} | reason: {reason}")
+        except Exception:
+            pass
+        await ctx.reply(f"✅ تم حظر المستخدم <@{target_id}>.\nالسبب: {reason}", mention_author=False)
+    except discord.Forbidden:
+        await ctx.reply("❌ فشل الحظر: ليس لدي الصلاحية اللازمة (Forbidden). تحقق من صلاحيات البوت وترتيب الأدوار.", mention_author=False)
+    except discord.HTTPException as e:
+        await ctx.reply(f"❌ فشل الحظر: حدث خطأ أثناء تنفيذ الطلب. {e}", mention_author=False)
+    except Exception as e:
+        await ctx.reply(f"❌ خطأ غير متوقع: {e}", mention_author=False)
 # ====================== أحداث البوت ======================
 
 @bot.event
